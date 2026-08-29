@@ -73,9 +73,11 @@
     return null;
   }
 
-  function fetchJson(url) {
-    return fetch(url, { headers: { accept: 'application/json' } }).then(function (r) {
-      if (!r.ok) throw new Error(url + ' → HTTP ' + r.status);
+  function fetchJson(url, headers) {
+    var h = { accept: 'application/json' };
+    if (headers) Object.keys(headers).forEach(function (k) { h[k] = headers[k]; });
+    return fetch(url, { headers: h }).then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
       return r.json();
     });
   }
@@ -356,37 +358,89 @@
     });
   }
 
-  /* Holder count, from a Base explorer — DexScreener doesn't report it. */
+  /* Holder count — DexScreener doesn't report it, and no single explorer is
+     reliable for a token this new, so try several and take the first real
+     answer. A launched token with liquidity cannot have zero holders, so a
+     zero means the explorer hasn't indexed it: treat it as no answer and move
+     on rather than printing it. */
+  function positive(n) {
+    return (typeof n === 'number' && isFinite(n) && n > 0) ? n : null;
+  }
+
+  var HOLDER_PROVIDERS = {
+
+    // Free, no key. Ships the field under different names across versions, and
+    // on a fresh token it sometimes only appears on the counters route.
+    blockscout: function (cfg) {
+      var base = (cfg.blockscoutBase || 'https://base.blockscout.com').replace(/\/+$/, '');
+      var token = base + '/api/v2/tokens/' + encodeURIComponent(address);
+      return softly('holders:blockscout', fetchJson(token).then(function (d) {
+        return positive(firstNumber(d, ['holders_count', 'holders']));
+      })).then(function (n) {
+        if (n) return n;
+        return softly('holders:blockscout:counters', fetchJson(token + '/counters').then(function (d) {
+          return positive(firstNumber(d, ['token_holders_count', 'holders_count', 'holders']));
+        }));
+      });
+    },
+
+    // Routescan indexes Base and exposes an Etherscan-compatible API without a
+    // key. Falls back to its own erc20 route, which reports the count beside
+    // the holder list.
+    routescan: function (cfg) {
+      var base = (cfg.routescanBase || 'https://api.routescan.io/v2/network/mainnet/evm/8453').replace(/\/+$/, '');
+      return softly('holders:routescan', fetchJson(base + '/etherscan/api?module=token&action=tokenholdercount' +
+        '&contractaddress=' + encodeURIComponent(address)).then(function (d) {
+          if (String(d && d.status) !== '1') throw new Error((d && (d.message || d.result)) || 'bad response');
+          return positive(num(d.result));
+        })).then(function (n) {
+          if (n) return n;
+          return softly('holders:routescan:erc20',
+            fetchJson(base + '/erc20/' + encodeURIComponent(address) + '/holders?limit=1').then(function (d) {
+              return positive(firstNumber(d, ['count', 'total', 'totalCount', 'holdersCount', 'link.count']));
+            }));
+        });
+    },
+
+    // Etherscan V2 multichain. The tokenholdercount action needs a paid plan.
+    etherscan: function (cfg) {
+      if (!cfg.etherscanApiKey) { log('holders:etherscan', 'skipped — no API key'); return Promise.resolve(null); }
+      return softly('holders:etherscan', fetchJson('https://api.etherscan.io/v2/api?chainid=' +
+        (CFG.chainId || 8453) + '&module=token&action=tokenholdercount&contractaddress=' +
+        encodeURIComponent(address) + '&apikey=' + encodeURIComponent(cfg.etherscanApiKey)).then(function (d) {
+          if (String(d && d.status) !== '1') throw new Error((d && (d.result || d.message)) || 'bad response');
+          return positive(num(d.result));
+        }));
+    },
+
+    // Moralis. Free tier, key required, sent as a header.
+    moralis: function (cfg) {
+      if (!cfg.moralisApiKey) { log('holders:moralis', 'skipped — no API key'); return Promise.resolve(null); }
+      return softly('holders:moralis', fetchJson('https://deep-index.moralis.io/api/v2.2/erc20/' +
+        encodeURIComponent(address) + '/holders?chain=' + (CFG.chain || 'base'),
+        { 'X-API-Key': cfg.moralisApiKey }).then(function (d) {
+          return positive(firstNumber(d, ['totalHolders', 'total_holders', 'total']));
+        }));
+    },
+  };
+
   function sourceHolders() {
     var cfg = SRC.holders || {};
     if (cfg.enabled === false || cfg.mode === 'none' || !address) return Promise.resolve(null);
 
-    if (cfg.mode === 'etherscan') {
-      if (!cfg.etherscanApiKey) { log('holders', 'etherscan mode needs an API key'); return Promise.resolve(null); }
-      var esUrl = 'https://api.etherscan.io/v2/api?chainid=' + (CFG.chainId || 8453) +
-        '&module=token&action=tokenholdercount&contractaddress=' + encodeURIComponent(address) +
-        '&apikey=' + encodeURIComponent(cfg.etherscanApiKey);
-      return softly('holders:etherscan', fetchJson(esUrl).then(function (d) {
-        if (String(d && d.status) !== '1') throw new Error(d && (d.result || d.message) || 'bad response');
-        var n = num(d.result);
-        return n === null ? null : { holders: n };
-      }));
-    }
+    var order = cfg.providers || ['blockscout', 'routescan', 'etherscan', 'moralis'];
 
-    var base = (cfg.blockscoutBase || 'https://base.blockscout.com').replace(/\/+$/, '');
-    var token = base + '/api/v2/tokens/' + encodeURIComponent(address);
-
-    // Blockscout has used both spellings across versions, and on a freshly
-    // indexed token the figure sometimes only appears on the counters route.
-    return softly('holders:blockscout', fetchJson(token).then(function (d) {
-      return firstNumber(d, ['holders_count', 'holders']);
-    })).then(function (n) {
-      if (n !== null && n !== undefined) return { holders: n };
-      return softly('holders:blockscout:counters', fetchJson(token + '/counters').then(function (d) {
-        return firstNumber(d, ['token_holders_count', 'holders_count', 'holders']);
-      })).then(function (m) {
-        return (m === null || m === undefined) ? null : { holders: m };
+    // Sequential on purpose: stop at the first provider with a real answer
+    // instead of hammering all four on every refresh.
+    return order.reduce(function (chain, name) {
+      return chain.then(function (found) {
+        if (found) return found;
+        var fn = HOLDER_PROVIDERS[name];
+        if (!fn) { log('holders', 'unknown provider ' + name); return null; }
+        return fn(cfg);
       });
+    }, Promise.resolve(null)).then(function (n) {
+      return n ? { holders: n } : null;
     });
   }
 

@@ -38,7 +38,7 @@ renders as `—` rather than as a number that isn't real.
 | Metric | Source | Status |
 |---|---|---|
 | Market cap, liquidity, 24h volume | DexScreener | live, no key |
-| Holders | Base Blockscout | live, no key |
+| Holders | Blockscout → Routescan → … | live, no key |
 | Total fees collected | project rewards API | **needs `sources.rewards.url`** |
 | Total $STONKEX distributed | project rewards API | **needs `sources.rewards.url`** |
 
@@ -70,15 +70,26 @@ the pool itself resolves fine. Of any list of pairs, the deepest-liquidity one o
 
 ### Holders — Blockscout
 
-DexScreener does not report holder counts, so they come from
-`https://base.blockscout.com/api/v2/tokens/<contract>` (free, no key). Blockscout
-has shipped the field as both `holders` and `holders_count`, and on a recently
-indexed token it sometimes only appears on `…/<contract>/counters` as
-`token_holders_count` — all three are tried in that order.
+DexScreener does not report holder counts, and no single explorer is dependable
+for a token this new — Blockscout was answering `0` for `$STONKEXSTR`, which just
+means it hadn't indexed the holders yet.
 
-Set `sources.holders.mode` to `'etherscan'` to use the Etherscan V2 multichain API
-instead — note its `tokenholdercount` action requires a paid Etherscan plan, and
-you must supply `sources.holders.etherscanApiKey`.
+So `sources.holders.providers` lists several, tried **in order**, and the first
+to return a count above zero wins:
+
+| Provider | Key | Notes |
+|---|---|---|
+| `blockscout` | none | `base.blockscout.com`. Reads `holders_count`, `holders`, then `token_holders_count` on `…/counters` |
+| `routescan` | none | Indexes Base, Etherscan-compatible API, with its own `erc20/…/holders` route as backup |
+| `etherscan` | `etherscanApiKey` | Etherscan V2 multichain. Its `tokenholdercount` action needs a **paid** plan |
+| `moralis` | `moralisApiKey` | Free tier is enough |
+
+**A zero is treated as no answer** and falls through to the next provider — a
+launched token with liquidity cannot have zero holders, so a zero is an
+un-indexed explorer, not data. Providers with no key configured are skipped, so
+the two key-free ones run first and the rest only engage once you add a key.
+
+Run with `?debug=1` to see which provider answered.
 
 ### Rewards — still unsourced
 

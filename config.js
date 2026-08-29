@@ -59,19 +59,32 @@ window.STONKEX_CONFIG = {
       enabled: true,
     },
 
-    /* Holder count. DexScreener does not report holders, so it comes from a
-       Base block explorer.
+    /* Holder count. DexScreener does not report holders, and no single explorer
+       is reliable for a token this new — Blockscout was answering 0 for
+       $STONKEXSTR, which just means it hasn't indexed the holders yet.
 
-       mode:
-         'blockscout' — https://base.blockscout.com, free, no key  (default)
-         'etherscan'  — Etherscan V2 multichain API. The tokenholdercount
-                        action requires a paid Etherscan API plan.
-         'none'       — don't fetch holders                                  */
+       So the providers below are tried IN ORDER and the first one to return a
+       count above zero wins. A zero is treated as "no answer" and falls through
+       to the next provider: a launched token with liquidity cannot have none.
+       Run the page with ?debug=1 to see which provider answered.
+
+         blockscout — base.blockscout.com. Free, no key.
+         routescan  — indexes Base, Etherscan-compatible API. Free, no key.
+         etherscan  — Etherscan V2 multichain. Needs `etherscanApiKey`, and its
+                      tokenholdercount action requires a PAID Etherscan plan.
+         moralis    — needs `moralisApiKey`; the free tier is enough.
+
+       Providers without a key configured are skipped, so the two key-free ones
+       are tried first and the rest only engage once you fill a key in. Set
+       `enabled: false` (or mode: 'none') to stop fetching holders entirely. */
     holders: {
       enabled: true,
-      mode: 'blockscout',
+      providers: ['blockscout', 'routescan', 'etherscan', 'moralis'],
+
       blockscoutBase: 'https://base.blockscout.com',
+      routescanBase: 'https://api.routescan.io/v2/network/mainnet/evm/8453',
       etherscanApiKey: '',
+      moralisApiKey: '',
     },
 
     /* Rewards figures — total fees collected and total $STONKEX distributed.
