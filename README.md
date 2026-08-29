@@ -121,22 +121,31 @@ The array is a fallback chain: the endpoint answers when it can, the file covers
 it when it doesn't. Add the response's own key names to the front of the matching
 list in `sources.rewards.fields` if they differ from the ones already there.
 
-**3. Index it yourself.** The figures live on-chain. `$STONKEXSTR` fees route to
-`rewards` through index contract `0xf01a4dab…51DE2E` (that is what
-`/api/fee-routing` reports), and the token launched at Base block **50530608** —
-so the range that needs scanning is bounded, not all of chain history.
+**3. Index it yourself — [`worker/`](worker/).** A Cloudflare Worker that reads
+the totals off Base on a cron and serves exactly the JSON above. This is the only
+option that stays correct without anyone touching it.
 
-A small scheduled job — Cloudflare Worker, Vercel cron, anything — can walk
-`eth_getLogs` for `$STONKEX` Transfer events from that contract, keep a running
-total, and serve it as the JSON above. That is the only option that stays correct
-without anyone touching it.
+It scans `eth_getLogs` for `$STONKEX` Transfer events, filtered by counterparty,
+from the token's launch block (**50530608**) forward — so the range is bounded,
+not all of chain history. Each run takes a bite, banks running totals in KV, and
+saves its cursor, so backfill is just several runs. Only the standard Transfer
+event is used, meaning none of it needs the rewards contract's ABI.
 
-What it cannot be is browser-side: summing transfer logs across Base history on
-every page load is not something a visitor's browser can do. It needs a job that
-runs on a schedule and stores the total.
+Deploy instructions, routes and tests are in [`worker/README.md`](worker/README.md).
+Once it is up:
 
-Check the index contract on Basescan first — if it is verified and exposes a
-total as a view function, one `eth_call` replaces the whole log scan.
+```js
+url: ['https://stonkex-rewards.<you>.workers.dev', 'data/rewards.json'],
+```
+
+⚠ **Verify the streams before trusting it.** Which flow means "fees" versus
+"distributed" has not been confirmed against the contracts — the fee locker in
+particular is shared across every coin on the platform, so as configured it
+likely over-counts. Check `/debug` against what thestonks.exchange reports for
+the token, adjust `STREAMS` in `worker/src/config.js`, then `POST /reset`.
+
+And check the index contract on Basescan first: if it is verified and exposes a
+cumulative total as a view function, one `eth_call` replaces the whole log scan.
 
 ### Debugging
 
