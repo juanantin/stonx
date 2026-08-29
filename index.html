@@ -14,14 +14,18 @@
 <meta name="twitter:site" content="@Stonks_Exchange">
 <meta name="theme-color" content="#f7f9fc">
 
-<link rel="icon" type="image/png" sizes="64x64" href="images/favicon.png">
-<link rel="apple-touch-icon" href="images/apple-touch-icon.png">
+<!-- favicon.ico sits at the root because browsers request /favicon.ico on their
+     own, regardless of these tags. All generated from images/stkstr_icon.png. -->
+<link rel="icon" href="favicon.ico?v=2026-08-29.9" sizes="any">
+<link rel="icon" type="image/png" sizes="64x64" href="images/favicon.png?v=2026-08-29.9">
+<link rel="apple-touch-icon" href="images/apple-touch-icon.png?v=2026-08-29.9">
+<link rel="manifest" href="site.webmanifest?v=2026-08-29.9">
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 
-<link rel="stylesheet" href="assets/css/styles.css?v=2026-08-29.8">
+<link rel="stylesheet" href="assets/css/styles.css?v=2026-08-29.9">
 </head>
 <body>
 
@@ -223,7 +227,7 @@
 
 <!-- ?v= is the cache buster: bump BUILD in both files on every deploy,
      or a CDN will keep serving the previous config.js and app.js. -->
-<script src="config.js?v=2026-08-29.8"></script>
-<script src="assets/js/app.js?v=2026-08-29.8"></script>
+<script src="config.js?v=2026-08-29.9"></script>
+<script src="assets/js/app.js?v=2026-08-29.9"></script>
 </body>
 </html>
