@@ -605,7 +605,10 @@
         'text-align:left;white-space:pre-wrap;word-break:break-word;';
       note.parentNode.insertBefore(box, note.nextSibling);
     }
-    box.textContent = sourceLog.map(function (s) {
+    var head = 'build ' + (CFG.version || 'unknown') +
+      '  ·  ' + new Date().toLocaleTimeString() + '\n\n';
+
+    box.textContent = head + sourceLog.map(function (s) {
       return (s.ok ? (s.empty ? '· empty  ' : '✓ ok     ') : '✗ failed ') +
         s.name + (s.ok ? '' : '  — ' + s.error);
     }).join('\n') || 'no sources ran';
