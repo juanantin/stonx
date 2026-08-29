@@ -79,10 +79,18 @@ to return a count above zero wins:
 
 | Provider | Key | Notes |
 |---|---|---|
-| `blockscout` | none | `base.blockscout.com`. Reads `holders_count`, `holders`, then `token_holders_count` on `…/counters` |
-| `routescan` | none | Indexes Base, Etherscan-compatible API, with its own `erc20/…/holders` route as backup |
+| `blockscout` | none | `base.blockscout.com`. Reads `holders_count`, `holders`, then `token_holders_count` on `…/counters`. Has not indexed this token — answered `0`, then errors |
+| `geckoterminal` | none | Token info route. Only has a count for tokens it has indexed |
 | `etherscan` | `etherscanApiKey` | Etherscan V2 multichain. Its `tokenholdercount` action needs a **paid** plan |
 | `moralis` | `moralisApiKey` | Free tier is enough |
+
+**The dependable answer is [`worker/`](worker/), not any of these.** It counts
+holders from `$STONKEXSTR` transfer history — every transfer folded into a
+running balance per address, then addresses with a positive balance counted,
+with the pool and fee contracts excluded. No explorer involved, so nothing to
+guess at. Once it is deployed and synced it supplies `holders` through
+`sources.rewards` and this chain becomes a fallback. The count is withheld until
+the backfill finishes, since a partial scan under-counts.
 
 **A zero is treated as no answer** and falls through to the next provider — a
 launched token with liquidity cannot have zero holders, so a zero is an

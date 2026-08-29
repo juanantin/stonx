@@ -25,11 +25,11 @@
      Formatting
      --------------------------------------------------------------------- */
 
-  var nf2 = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  // Whole numbers throughout — cents on a market cap are noise.
   var nf0 = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
 
-  function usd(n) { return '$' + nf2.format(n); }
-  function amount(n) { return nf2.format(n); }
+  function usd(n) { return '$' + nf0.format(Math.round(n)); }
+  function amount(n) { return nf0.format(Math.round(n)); }
   function count(n) { return nf0.format(Math.round(n)); }
 
   var FORMATTERS = {
@@ -385,22 +385,19 @@
       });
     },
 
-    // Routescan indexes Base and exposes an Etherscan-compatible API without a
-    // key. Falls back to its own erc20 route, which reports the count beside
-    // the holder list.
-    routescan: function (cfg) {
-      var base = (cfg.routescanBase || 'https://api.routescan.io/v2/network/mainnet/evm/8453').replace(/\/+$/, '');
-      return softly('holders:routescan', fetchJson(base + '/etherscan/api?module=token&action=tokenholdercount' +
-        '&contractaddress=' + encodeURIComponent(address)).then(function (d) {
-          if (String(d && d.status) !== '1') throw new Error((d && (d.message || d.result)) || 'bad response');
-          return positive(num(d.result));
-        })).then(function (n) {
-          if (n) return n;
-          return softly('holders:routescan:erc20',
-            fetchJson(base + '/erc20/' + encodeURIComponent(address) + '/holders?limit=1').then(function (d) {
-              return positive(firstNumber(d, ['count', 'total', 'totalCount', 'holdersCount', 'link.count']));
-            }));
-        });
+    // GeckoTerminal's token info route. Free, no key, CORS-enabled. Reports a
+    // holder count for tokens it has indexed; not every token has one.
+    geckoterminal: function (cfg) {
+      var base = (cfg.geckoterminalBase || 'https://api.geckoterminal.com/api/v2').replace(/\/+$/, '');
+      return softly('holders:geckoterminal',
+        fetchJson(base + '/networks/' + (CFG.chain || 'base') + '/tokens/' +
+          encodeURIComponent(address) + '/info').then(function (d) {
+            return positive(firstNumber(d, [
+              'data.attributes.holders.count',
+              'data.attributes.holders',
+              'data.attributes.holder_count',
+            ]));
+          }));
     },
 
     // Etherscan V2 multichain. The tokenholdercount action needs a paid plan.
@@ -429,7 +426,7 @@
     var cfg = SRC.holders || {};
     if (cfg.enabled === false || cfg.mode === 'none' || !address) return Promise.resolve(null);
 
-    var order = cfg.providers || ['blockscout', 'routescan', 'etherscan', 'moralis'];
+    var order = cfg.providers || ['blockscout', 'geckoterminal', 'etherscan', 'moralis'];
 
     // Sequential on purpose: stop at the first provider with a real answer
     // instead of hammering all four on every refresh.

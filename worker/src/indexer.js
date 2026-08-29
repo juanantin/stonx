@@ -40,6 +40,43 @@ export function hexToBigInt(hex) {
   return BigInt(hex);
 }
 
+export const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
+
+/** Pull from/to/value out of a standard Transfer log. */
+export function decodeTransfer(log) {
+  const topics = log.topics || [];
+  const addr = (t) => '0x' + String(t).slice(-40).toLowerCase();
+  return {
+    from: topics[1] ? addr(topics[1]) : null,
+    to: topics[2] ? addr(topics[2]) : null,
+    value: hexToBigInt(log.data),
+  };
+}
+
+/**
+ * Fold transfers into a map of address -> balance delta. Mints and burns move
+ * through the zero address, which is not a holder, so it is skipped.
+ */
+export function applyTransfers(deltas, logs) {
+  for (const log of logs || []) {
+    const { from, to, value } = decodeTransfer(log);
+    if (value === 0n) continue;
+    if (from && from !== ZERO_ADDRESS) deltas[from] = (deltas[from] || 0n) - value;
+    if (to && to !== ZERO_ADDRESS) deltas[to] = (deltas[to] || 0n) + value;
+  }
+  return deltas;
+}
+
+/** Addresses left holding a positive balance. */
+export function countHolders(balances) {
+  let n = 0;
+  for (const k in balances) {
+    if (k === ZERO_ADDRESS) continue;
+    if (BigInt(balances[k]) > 0n) n++;
+  }
+  return n;
+}
+
 export function sumTransferLogs(logs) {
   // Transfer's only non-indexed parameter is `value`, so it is the whole data word.
   return (logs || []).reduce((acc, log) => acc + hexToBigInt(log.data), 0n);
@@ -66,8 +103,10 @@ export function isRangeTooLarge(err) {
  * back. Stops early once `maxChunks` is spent so a single run stays inside a
  * Worker's CPU budget; the cursor it returns is where the next run picks up.
  *
- * Returns { cursor, totals, chunksUsed, complete } where cursor is the next
- * unscanned block and totals is keyed by stream id (BigInt base units).
+ * Returns { cursor, totals, balances, chunksUsed, complete }. `cursor` is the
+ * next unscanned block. `totals` holds summed amounts per 'sum' stream;
+ * `balances` holds per-address DELTAS for each 'balances' stream, so a caller
+ * can add them to a running map across runs.
  */
 export async function indexRange(opts) {
   const {
@@ -79,7 +118,11 @@ export async function indexRange(opts) {
   } = opts;
 
   const totals = {};
-  streams.forEach((s) => { totals[s.id] = 0n; });
+  const balances = {};
+  streams.forEach((s) => {
+    if (s.kind === 'balances') balances[s.id] = {};
+    else totals[s.id] = 0n;
+  });
 
   let cursor = from;
   let size = chunkSize;
@@ -104,14 +147,17 @@ export async function indexRange(opts) {
       throw err;
     }
 
-    streams.forEach((s, i) => { totals[s.id] += sumTransferLogs(logsByStream[i]); });
+    streams.forEach((s, i) => {
+      if (s.kind === 'balances') applyTransfers(balances[s.id], logsByStream[i]);
+      else totals[s.id] += sumTransferLogs(logsByStream[i]);
+    });
 
     cursor = end + 1;
     chunksUsed++;
     if (onProgress) onProgress({ cursor, to, chunksUsed });
   }
 
-  return { cursor, totals, chunksUsed, complete: cursor > to };
+  return { cursor, totals, balances, chunksUsed, complete: cursor > to };
 }
 
 /** Minimal JSON-RPC client. */

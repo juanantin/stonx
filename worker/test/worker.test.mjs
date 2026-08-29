@@ -147,3 +147,62 @@ test('a failing RPC is recorded, not thrown, and totals are kept', async () => {
   assert.match(dbg.lastError, /503/);
   assert.equal(dbg.rawTotals.distributed, (9n * E18).toString(), 'totals survive an error');
 });
+
+test('counts holders from transfers, across a resumed backfill', async () => {
+  const mod = (await import('../src/index.js')).default;
+  const { CONTRACTS } = await import('../src/config.js');
+
+  const ZERO = '0x0000000000000000000000000000000000000000';
+  const A = '0x1111111111111111111111111111111111111111';
+  const B = '0x2222222222222222222222222222222222222222';
+  const POOL = CONTRACTS.pool.toLowerCase();
+  const T = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
+  const topic = (a) => '0x' + '0'.repeat(24) + a.slice(2);
+  const xfer = (f, t, amt) => ({ topics: [T, topic(f), topic(t)], data: word(amt) });
+
+  const KV = fakeKV();
+  // Two windows of history; the second run must build on the first.
+  const windows = [
+    { head: START + 99, logs: { [START + 1]: xfer(ZERO, A, 10n * E18), [START + 2]: xfer(ZERO, POOL, 90n * E18) } },
+    { head: START + 199, logs: { [START + 150]: xfer(A, B, 4n * E18) } },
+  ];
+
+  for (const wnd of windows) {
+    globalThis.fetch = async (url, init) => {
+      if (String(url).includes('dexscreener')) return { ok: true, json: async () => ({ pairs: [] }) };
+      const body = JSON.parse(init.body);
+      if (body.method === 'eth_blockNumber') {
+        return { ok: true, json: async () => ({ result: '0x' + wnd.head.toString(16) }) };
+      }
+      const f = body.params[0];
+      const from = parseInt(f.fromBlock, 16), to = parseInt(f.toBlock, 16);
+      // only the balances stream has no from/to topic filter
+      if (f.topics.length !== 1) return { ok: true, json: async () => ({ result: [] }) };
+      const logs = Object.entries(wnd.logs).filter(([b]) => +b >= from && +b <= to).map(([, l]) => l);
+      return { ok: true, json: async () => ({ result: logs }) };
+    };
+    await runCron(mod, { STONKEX: KV, RPC_URL: 'http://rpc.test', ADMIN_TOKEN: 'secret' });
+  }
+
+  const env = { STONKEX: KV, RPC_URL: 'http://rpc.test', ADMIN_TOKEN: 'secret' };
+  const dbg = await (await mod.fetch(new Request('https://w/debug'), env, ctx)).json();
+
+  // A has 6, B has 4, and the pool's 90 is excluded — so two holders.
+  assert.equal(dbg.holders, 2, 'pool must not count as a holder');
+  assert.equal(dbg.addressesTracked, 3, 'pool is still tracked, just not counted');
+
+  const body = await (await mod.fetch(new Request('https://w/'), env, ctx)).json();
+  assert.equal(body.holders, 2);
+});
+
+test('withholds the holder count until the backfill has finished', async () => {
+  const mod = (await import('../src/index.js')).default;
+  const { env } = makeEnv(START + 500000, { distributed: [], feesIn: [] });
+  await runCron(mod, env);                       // far more blocks than one run covers
+
+  const body = await (await mod.fetch(new Request('https://w/'), env, ctx)).json();
+  const dbg = await (await mod.fetch(new Request('https://w/debug'), env, ctx)).json();
+  assert.equal(dbg.synced, false);
+  assert.equal(body.holders, null, 'a partial scan under-counts, so publish nothing');
+  assert.ok(dbg.blocksBehind > 0);
+});

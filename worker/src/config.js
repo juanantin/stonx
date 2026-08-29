@@ -35,11 +35,25 @@ export const START_BLOCK = 50530608;
 
    `feesIn` — $STONKEX arriving at the fee locker. The locker address is shared
    across every coin on the platform, so this almost certainly over-counts as
-   written and is the first thing to verify. */
+   written and is the first thing to verify.
+
+   `holders` — every $STONKEXSTR transfer, folded into a running balance per
+   address. Counting addresses left with a positive balance gives the holder
+   count exactly, with no explorer involved. This one needs no address
+   guesswork, so unlike the two above it is correct as written. */
 export const STREAMS = [
-  { id: 'distributed', token: TOKENS.KEX, from: CONTRACTS.rewardsIndex, decimals: 18 },
-  { id: 'feesIn', token: TOKENS.KEX, to: CONTRACTS.feeLocker, decimals: 18 },
+  { id: 'distributed', kind: 'sum', token: TOKENS.KEX, from: CONTRACTS.rewardsIndex, decimals: 18 },
+  { id: 'feesIn', kind: 'sum', token: TOKENS.KEX, to: CONTRACTS.feeLocker, decimals: 18 },
+  { id: 'holders', kind: 'balances', token: TOKENS.STR, decimals: 18 },
 ];
+
+/* Addresses that hold supply but are not holders in the sense the tile means:
+   the pool itself, the fee locker, the rewards contract. */
+export const EXCLUDE_FROM_HOLDERS = [
+  CONTRACTS.pool,
+  CONTRACTS.feeLocker,
+  CONTRACTS.rewardsIndex,
+].map((a) => a.toLowerCase());
 
 /* Scan pacing. A Worker run is short, so it takes bites and resumes. Raise
    MAX_CHUNKS_PER_RUN to backfill faster; lower CHUNK_SIZE if the RPC complains

@@ -8,7 +8,7 @@ window.STONKEX_CONFIG = {
   /* Build stamp. Shown in the ?debug=1 panel, so you can confirm which version
      a browser actually has rather than guessing at a cache. Bump it together
      with the ?v= on the script tags in index.html whenever you deploy. */
-  version: '2026-08-29.7',
+  version: '2026-08-29.8',
 
   /* ---- Token ---------------------------------------------------------- */
 
@@ -73,21 +73,28 @@ window.STONKEX_CONFIG = {
        to the next provider: a launched token with liquidity cannot have none.
        Run the page with ?debug=1 to see which provider answered.
 
-         blockscout — base.blockscout.com. Free, no key.
-         routescan  — indexes Base, Etherscan-compatible API. Free, no key.
-         etherscan  — Etherscan V2 multichain. Needs `etherscanApiKey`, and its
-                      tokenholdercount action requires a PAID Etherscan plan.
-         moralis    — needs `moralisApiKey`; the free tier is enough.
+         blockscout     — base.blockscout.com. Free, no key. Was returning 0,
+                          then errors, for this token — it has not indexed it.
+         geckoterminal  — free, no key. Only has a count for tokens it indexes.
+         etherscan      — Etherscan V2 multichain. Needs `etherscanApiKey`, and
+                          its tokenholdercount action requires a PAID plan.
+         moralis        — needs `moralisApiKey`; the free tier is enough.
 
-       Providers without a key configured are skipped, so the two key-free ones
-       are tried first and the rest only engage once you fill a key in. Set
-       `enabled: false` (or mode: 'none') to stop fetching holders entirely. */
+       Providers without a key are skipped, so the key-free ones are tried first
+       and the rest only engage once you fill a key in.
+
+       ▸ The reliable answer is the indexer in worker/: it counts holders from
+         $STONKEXSTR transfer history, so it needs no explorer at all. Once it
+         is deployed and synced it supplies `holders` through sources.rewards
+         and this whole chain becomes a fallback.
+
+       Set `enabled: false` to stop fetching holders here entirely. */
     holders: {
       enabled: true,
-      providers: ['blockscout', 'routescan', 'etherscan', 'moralis'],
+      providers: ['blockscout', 'geckoterminal', 'etherscan', 'moralis'],
 
       blockscoutBase: 'https://base.blockscout.com',
-      routescanBase: 'https://api.routescan.io/v2/network/mainnet/evm/8453',
+      geckoterminalBase: 'https://api.geckoterminal.com/api/v2',
       etherscanApiKey: '',
       moralisApiKey: '',
     },

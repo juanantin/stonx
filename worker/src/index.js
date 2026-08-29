@@ -7,13 +7,17 @@
    POST /reset  → clear state and rescan from START_BLOCK (needs ADMIN_TOKEN)
    ========================================================================== */
 
-import { indexRange, makeRpc, toNumber } from './indexer.js';
+import { indexRange, makeRpc, toNumber, countHolders } from './indexer.js';
 import {
   STREAMS, START_BLOCK, CHUNK_SIZE, MAX_CHUNKS_PER_RUN, CONFIRMATIONS,
-  DEXSCREENER_PAIR, DEXSCREENER_KEX_TOKEN, TOKENS, CONTRACTS,
+  DEXSCREENER_KEX_TOKEN, TOKENS, CONTRACTS, EXCLUDE_FROM_HOLDERS,
 } from './config.js';
 
 const STATE_KEY = 'state:v1';
+const BALANCES_KEY = 'balances:v1';
+
+const SUM_STREAMS = STREAMS.filter((s) => s.kind !== 'balances');
+const BALANCE_STREAMS = STREAMS.filter((s) => s.kind === 'balances');
 
 const CORS = {
   'access-control-allow-origin': '*',
@@ -47,8 +51,31 @@ async function saveState(env, state) {
 /** Totals live in KV as decimal strings — JSON has no BigInt. */
 function totalsToBigInt(totals) {
   const out = {};
-  STREAMS.forEach((s) => { out[s.id] = BigInt((totals && totals[s.id]) || '0'); });
+  SUM_STREAMS.forEach((s) => { out[s.id] = BigInt((totals && totals[s.id]) || '0'); });
   return out;
+}
+
+/* Balances are a per-address running map, kept across runs. Each scan returns
+   deltas for the blocks it covered, which are added in here. */
+async function loadBalances(env) {
+  return (await env.STONKEX.get(BALANCES_KEY, 'json')) || {};
+}
+
+function mergeDeltas(stored, deltas) {
+  for (const addr in deltas) {
+    const next = BigInt(stored[addr] || '0') + deltas[addr];
+    if (next === 0n) delete stored[addr];        // keep the map from growing forever
+    else stored[addr] = next.toString();
+  }
+  return stored;
+}
+
+function holderCount(balances) {
+  const filtered = {};
+  for (const a in balances) {
+    if (EXCLUDE_FROM_HOLDERS.indexOf(a) === -1) filtered[a] = balances[a];
+  }
+  return countHolders(filtered);
 }
 
 function totalsToStrings(totals) {
@@ -85,6 +112,7 @@ async function sync(env, ctx) {
   if (!isFinite(head) || head <= 0) throw new Error('bad head block');
 
   const running = totalsToBigInt(state.totals);
+  let balances = BALANCE_STREAMS.length ? await loadBalances(env) : null;
 
   if (state.cursor <= head) {
     const res = await indexRange({
@@ -96,12 +124,18 @@ async function sync(env, ctx) {
       maxChunks: MAX_CHUNKS_PER_RUN,
     });
 
-    STREAMS.forEach((s) => { running[s.id] += res.totals[s.id]; });
+    SUM_STREAMS.forEach((s) => { running[s.id] += res.totals[s.id]; });
+    BALANCE_STREAMS.forEach((s) => { balances = mergeDeltas(balances, res.balances[s.id]); });
+
     state.cursor = res.cursor;
     state.complete = res.complete;
     state.chunksLastRun = res.chunksUsed;
+
+    if (balances) await env.STONKEX.put(BALANCES_KEY, JSON.stringify(balances));
   }
 
+  state.holders = balances ? holderCount(balances) : null;
+  state.addressesTracked = balances ? Object.keys(balances).length : null;
   state.totals = totalsToStrings(running);
   state.head = head;
   state.updatedAt = new Date().toISOString();
@@ -115,7 +149,7 @@ async function sync(env, ctx) {
 function present(state, price) {
   const totals = totalsToBigInt(state.totals);
   const byId = {};
-  STREAMS.forEach((s) => { byId[s.id] = toNumber(totals[s.id], s.decimals); });
+  SUM_STREAMS.forEach((s) => { byId[s.id] = toNumber(totals[s.id], s.decimals); });
 
   const distributed = byId.distributed ?? null;
   const feesIn = byId.feesIn ?? null;
@@ -126,6 +160,10 @@ function present(state, price) {
     // Cumulative fees valued at the CURRENT price, not the price at the time of
     // each transfer. Good enough for a headline figure; say so if it matters.
     totalFeesCollected: price != null && feesIn != null ? feesIn * price : null,
+
+    // Counted from transfers, so no explorer is involved. Only trustworthy once
+    // the backfill has finished — a partial scan under-counts.
+    holders: state.complete ? (state.holders ?? null) : null,
 
     updatedAt: state.updatedAt,
     meta: {
@@ -157,6 +195,7 @@ export default {
         return json({ error: 'unauthorized' }, 401);
       }
       await env.STONKEX.delete(STATE_KEY);
+      await env.STONKEX.delete(BALANCES_KEY);
       return json({ ok: true, message: 'state cleared; next cron rescans from ' + START_BLOCK });
     }
 
@@ -172,8 +211,13 @@ export default {
         updatedAt: state.updatedAt,
         lastError: state.lastError,
         startBlock: START_BLOCK,
+        holders: state.holders ?? null,
+        addressesTracked: state.addressesTracked ?? null,
         rawTotals: state.totals,          // base units, as indexed
-        streams: STREAMS.map((s) => ({ id: s.id, token: s.token, from: s.from || null, to: s.to || null })),
+        streams: STREAMS.map((s) => ({
+          id: s.id, kind: s.kind || 'sum', token: s.token,
+          from: s.from || null, to: s.to || null,
+        })),
         contracts: CONTRACTS,
       }, 200, { 'cache-control': 'no-store' });
     }

@@ -126,3 +126,69 @@ test('tracks several streams independently in one pass', async () => {
   assert.equal(toNumber(res.totals.distributed, 18), 1);
   assert.equal(toNumber(res.totals.feesIn, 18), 7);
 });
+
+/* ---- holder counting ---------------------------------------------------- */
+
+import { decodeTransfer, applyTransfers, countHolders, ZERO_ADDRESS } from '../src/indexer.js';
+
+const A = '0x1111111111111111111111111111111111111111';
+const B = '0x2222222222222222222222222222222222222222';
+const C = '0x3333333333333333333333333333333333333333';
+const topic = (a) => '0x' + '0'.repeat(24) + a.slice(2);
+const xfer = (from, to, amount) => ({ topics: [TRANSFER_TOPIC, topic(from), topic(to)], data: word(amount) });
+
+test('decodes from, to and value out of a Transfer log', () => {
+  const d = decodeTransfer(xfer(A, B, 42n));
+  assert.equal(d.from, A);
+  assert.equal(d.to, B);
+  assert.equal(d.value, 42n);
+});
+
+test('mints credit the recipient and ignore the zero address', () => {
+  const deltas = applyTransfers({}, [xfer(ZERO_ADDRESS, A, 100n)]);
+  assert.equal(deltas[A], 100n);
+  assert.equal(ZERO_ADDRESS in deltas, false);
+  assert.equal(countHolders(deltas), 1);
+});
+
+test('a wallet that sends everything away stops counting', () => {
+  const deltas = applyTransfers({}, [
+    xfer(ZERO_ADDRESS, A, 100n),
+    xfer(A, B, 100n),                 // A is now empty
+  ]);
+  assert.equal(deltas[A], 0n);
+  assert.equal(deltas[B], 100n);
+  assert.equal(countHolders(deltas), 1);
+});
+
+test('burns to the zero address reduce the holder, not the void', () => {
+  const deltas = applyTransfers({}, [xfer(ZERO_ADDRESS, A, 100n), xfer(A, ZERO_ADDRESS, 100n)]);
+  assert.equal(countHolders(deltas), 0);
+  assert.equal(ZERO_ADDRESS in deltas, false);
+});
+
+test('zero-value transfers do not create phantom holders', () => {
+  const deltas = applyTransfers({}, [xfer(A, B, 0n)]);
+  assert.deepEqual(deltas, {});
+  assert.equal(countHolders(deltas), 0);
+});
+
+test('counts holders across a chunked scan', async () => {
+  const byBlock = {
+    10: xfer(ZERO_ADDRESS, A, 500n),
+    20: xfer(A, B, 200n),
+    150: xfer(A, C, 100n),
+    260: xfer(C, B, 100n),            // C empties out again
+  };
+  const rpc = async (_m, [f]) => {
+    const from = parseInt(f.fromBlock, 16), to = parseInt(f.toBlock, 16);
+    return Object.entries(byBlock).filter(([b]) => +b >= from && +b <= to).map(([, l]) => l);
+  };
+  const stream = { id: 'holders', kind: 'balances', token: KEX, decimals: 18 };
+  const res = await indexRange({ rpc, streams: [stream], from: 0, to: 299, chunkSize: 100 });
+
+  assert.equal(res.balances.holders[A], 200n);   // 500 − 200 − 100
+  assert.equal(res.balances.holders[B], 300n);   // 200 + 100
+  assert.equal(res.balances.holders[C], 0n);     // received then sent
+  assert.equal(countHolders(res.balances.holders), 2);
+});
