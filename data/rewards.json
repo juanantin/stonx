@@ -2,7 +2,7 @@
   "__doc": [
     "Fees collected and $STONKEX distributed for $STONKEXSTR.",
     "",
-    "No explorer knows these \u2014 they are protocol figures \u2014 so this file is the",
+    "No explorer knows these — they are protocol figures — so this file is the",
     "simplest way to feed them: same-origin, no CORS, no infrastructure.",
     "config.js already points sources.rewards.url here.",
     "",
@@ -13,24 +13,25 @@
     "Keys are plain numbers, not strings, and not pre-formatted:",
     "  totalFeesCollected   USD, all fees the pool has generated",
     "  totalDistributed     $STONKEX tokens sent to holders",
-    "  totalDistributedUsd  optional \u2014 omit and the site derives it from the",
+    "  totalDistributedUsd  optional — omit and the site derives it from the",
     "                       live $STONKEX price",
-    "  holders              optional \u2014 overrides the explorer lookup",
+    "  holders              optional — overrides the explorer lookup",
     "",
     "history is optional: 3+ points per metric, oldest to newest, drawn as the",
     "tile's sparkline. Keys are fees, distributed, holders, marketCap,",
     "liquidity, volume24h. Without it the site records its own rolling series.",
     "",
-    "Once a real source exists (see README \u25b8 Rewards), point",
+    "Once a real source exists (see README ▸ Rewards), point",
     "sources.rewards.url at that instead and this file can go."
   ],
-  "totalFeesCollected": null,
-  "totalDistributed": null,
-  "totalDistributedUsd": null,
-  "holders": null,
-  "updatedAt": null,
+  "totalDistributed": 69904.55812510186,
+  "totalDistributedUsd": 112.8259568139144,
+  "totalFeesCollected": 125.36217423768268,
+  "holders": 96,
+  "updatedAt": "2026-08-29T16:45:37.648Z",
   "meta": {
-    "synced": false,
-    "note": "cleared for rescan after the stream fix"
+    "synced": true,
+    "blocksBehind": 0,
+    "kexPriceUsd": 0.001614
   }
 }
