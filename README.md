@@ -86,8 +86,11 @@ the page falls back to `execCommand` elsewhere.)
 ## Notes
 
 - Light theme only, by design — the brand artwork is built for a white ground.
-- Each partner lockup sits on the plate its artwork needs — dark for Stonks.Exchange
-  (light artwork), light for Stockify (dark artwork) — at a matched button size.
+- Both ecosystem lockups sit on the same white plate at a matched size. The
+  Stonks.Exchange wordmark shipped near-white (built for a dark background), so
+  `images/stonkex_button.png` has had that wordmark recoloured dark — the icon and
+  the blue `.EXCHANGE` are untouched. Swap in an official light-background lockup
+  if Stonks.Exchange publishes one.
 - `images/logo.png`, `favicon.png` and `apple-touch-icon.png` are all generated from
   `images/stonx_logo.jpg`. Regenerate them together if the mark changes.
 - On mobile the hero runs edge to edge, the dashboard drops to two tiles per row, and

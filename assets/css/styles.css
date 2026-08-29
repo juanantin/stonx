@@ -428,38 +428,25 @@ a { color: inherit; text-decoration: none; }
   line-height: 1.35;
 }
 
-/* The lockups are the links — each sits on the plate its artwork needs.
-   Stonks.Exchange is light-on-transparent, so it takes the dark plate;
-   Stockify is dark-on-transparent, so it takes the light one. */
+/* The lockups are the links. Both sit on the same white plate as the rest of
+   the page furniture. */
 .partner__brand {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   min-width: 240px;   /* the two lockups differ in ratio — match the plates */
   padding: 16px 26px;
+  border: 1px solid var(--line);
   border-radius: 18px;
-  transition: transform .18s ease, box-shadow .18s ease;
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
 }
 
 .partner__brand img { height: 38px; width: auto; }
 
-.partner__brand--dark {
-  background: linear-gradient(180deg, #1c2434 0%, #0f141d 100%);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 4px 16px rgba(11,14,20,.2);
-}
-
-.partner__brand--light {
-  background: var(--surface);
-  border: 1px solid var(--line);
-  box-shadow: var(--shadow-sm);
-}
-
 .partner:hover .partner__brand {
   transform: translateY(-2px);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.1), 0 8px 22px rgba(11,14,20,.22);
-}
-
-.partner:hover .partner__brand--light {
   border-color: #d8e0ee;
   box-shadow: 0 8px 22px rgba(11,14,20,.12);
 }
