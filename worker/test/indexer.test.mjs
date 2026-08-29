@@ -192,3 +192,29 @@ test('counts holders across a chunked scan', async () => {
   assert.equal(res.balances.holders[C], 0n);     // received then sent
   assert.equal(countHolders(res.balances.holders), 2);
 });
+
+test('stopOnError banks the chunks that succeeded instead of losing them', async () => {
+  let calls = 0;
+  const rpc = async (_m, [f]) => {
+    if (++calls > 3) throw new Error('rpc HTTP 429');
+    const from = parseInt(f.fromBlock, 16), to = parseInt(f.toBlock, 16);
+    return (from <= 150 && to >= 150) ? [{ data: word(5n * 10n ** 18n) }] : [];
+  };
+  const res = await indexRange({
+    rpc, streams: [stream], from: 100, to: 9999, chunkSize: 100, stopOnError: true,
+  });
+
+  assert.ok(res.error, 'the error is reported, not swallowed');
+  assert.equal(res.complete, false);
+  assert.ok(res.cursor > 100, 'cursor advanced past the chunks that worked');
+  assert.equal(toNumber(res.totals.distributed, 18), 5, 'and their totals survived');
+});
+
+test('without stopOnError it still throws, discarding the partial pass', async () => {
+  let calls = 0;
+  const rpc = async () => { if (++calls > 2) throw new Error('rpc HTTP 429'); return []; };
+  await assert.rejects(
+    indexRange({ rpc, streams: [stream], from: 1, to: 9999, chunkSize: 100 }),
+    /429/
+  );
+});

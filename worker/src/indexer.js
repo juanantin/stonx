@@ -103,7 +103,7 @@ export function isRangeTooLarge(err) {
  * back. Stops early once `maxChunks` is spent so a single run stays inside a
  * Worker's CPU budget; the cursor it returns is where the next run picks up.
  *
- * Returns { cursor, totals, balances, chunksUsed, complete }. `cursor` is the
+ * Returns { cursor, totals, balances, chunksUsed, complete, error? }. `cursor` is the
  * next unscanned block. `totals` holds summed amounts per 'sum' stream;
  * `balances` holds per-address DELTAS for each 'balances' stream, so a caller
  * can add them to a running map across runs.
@@ -115,6 +115,10 @@ export async function indexRange(opts) {
     minChunkSize = 50,
     maxChunks = 60,
     onProgress,
+    // Return what was scanned so far alongside the error, instead of throwing
+    // it and discarding the chunks that already succeeded. A long backfill on a
+    // rate-limited RPC would otherwise never make progress.
+    stopOnError = false,
   } = opts;
 
   const totals = {};
@@ -144,6 +148,7 @@ export async function indexRange(opts) {
         size = Math.max(minChunkSize, Math.floor(size / 2));
         continue;                       // same cursor, smaller bite
       }
+      if (stopOnError) return { cursor, totals, balances, chunksUsed, complete: false, error: err };
       throw err;
     }
 

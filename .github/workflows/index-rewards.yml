@@ -34,6 +34,9 @@ jobs:
         run: node scripts/index-rewards.mjs
 
       - name: Commit if anything changed
+        # always(): a partial scan is still progress, and dropping it would mean
+        # a rate-limited RPC could never finish the backfill.
+        if: always()
         run: |
           if git diff --quiet -- data/; then
             echo "no change"

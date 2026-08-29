@@ -27,6 +27,26 @@ const RPC_URL = process.env.RPC_URL || 'https://mainnet.base.org';
 // and a backfill can always finish on the next run.
 const BUDGET_MS = Number(process.env.BUDGET_MS || 8 * 60 * 1000);
 
+/* Public RPCs rate-limit hard during a backfill. Retry those rather than
+   losing the run, since a lost run means a lost scan window. */
+function retrying(rpc, tries = 5) {
+  return async function (method, params) {
+    let wait = 800;
+    for (let i = 0; ; i++) {
+      try {
+        return await rpc(method, params);
+      } catch (err) {
+        const m = String(err.message || err);
+        const transient = /429|rate|timeout|ETIMEDOUT|ECONNRESET|502|503|504/i.test(m);
+        if (!transient || i >= tries - 1) throw err;
+        process.stdout.write(`  ${m} — retrying in ${wait}ms\n`);
+        await new Promise((r) => setTimeout(r, wait));
+        wait *= 2;
+      }
+    }
+  };
+}
+
 const SUM_STREAMS = STREAMS.filter((s) => s.kind !== 'balances');
 const BALANCE_STREAMS = STREAMS.filter((s) => s.kind === 'balances');
 
@@ -63,7 +83,7 @@ async function kexPriceUsd() {
 
 async function main() {
   const started = Date.now();
-  const rpc = makeRpc(RPC_URL);
+  const rpc = retrying(makeRpc(RPC_URL));
   const state = loadState();
 
   const head = parseInt(await rpc('eth_blockNumber'), 16) - CONFIRMATIONS;
@@ -73,28 +93,39 @@ async function main() {
   SUM_STREAMS.forEach((s) => { totals[s.id] = BigInt(state.totals?.[s.id] || '0'); });
   const balances = { ...(state.balances || {}) };
 
+  const startCursor = state.cursor;
   let cursor = state.cursor;
   let passes = 0;
+  let scanError = null;
 
-  // Keep scanning until caught up or out of time.
-  while (cursor <= head && Date.now() - started < BUDGET_MS) {
-    const res = await indexRange({
-      rpc, streams: STREAMS, from: cursor, to: head,
-      chunkSize: CHUNK_SIZE, maxChunks: 40,
-    });
+  // Keep scanning until caught up or out of time. Whatever is scanned before a
+  // failure is still banked below, so a flaky RPC costs a window, not the run.
+  try {
+    while (cursor <= head && Date.now() - started < BUDGET_MS) {
+      const res = await indexRange({
+        rpc, streams: STREAMS, from: cursor, to: head,
+        chunkSize: CHUNK_SIZE, maxChunks: 40,
+        stopOnError: true,          // keep the chunks that landed
+      });
+      if (res.error) scanError = res.error;
 
-    SUM_STREAMS.forEach((s) => { totals[s.id] += res.totals[s.id]; });
-    for (const s of BALANCE_STREAMS) {
-      for (const [addr, delta] of Object.entries(res.balances[s.id])) {
-        const next = BigInt(balances[addr] || '0') + delta;
-        if (next === 0n) delete balances[addr]; else balances[addr] = next.toString();
+      SUM_STREAMS.forEach((s) => { totals[s.id] += res.totals[s.id]; });
+      for (const s of BALANCE_STREAMS) {
+        for (const [addr, delta] of Object.entries(res.balances[s.id])) {
+          const next = BigInt(balances[addr] || '0') + delta;
+          if (next === 0n) delete balances[addr]; else balances[addr] = next.toString();
+        }
       }
-    }
 
-    if (res.cursor === cursor) break;          // no progress; don't spin
-    cursor = res.cursor;
-    passes++;
-    process.stdout.write(`  scanned to ${cursor - 1} (${head - cursor + 1} behind)\n`);
+      if (res.cursor === cursor) break;          // no progress; don't spin
+      cursor = res.cursor;
+      passes++;
+      process.stdout.write(`  scanned to ${cursor - 1} (${head - cursor + 1} behind)\n`);
+      if (res.error) break;                      // banked what we could; stop here
+    }
+  } catch (err) {
+    scanError = err;
+    console.error('  scan stopped:', err.message);
   }
 
   const complete = cursor > head;
@@ -126,6 +157,11 @@ async function main() {
   console.log(complete
     ? `synced · distributed ${distributed} · fees ${feesIn} KEX · holders ${holders} · price ${price}`
     : `partial · ${head - cursor + 1} blocks behind · continues next run`);
+
+  // Advancing the cursor at all is progress worth committing, so only fail the
+  // job when a run achieved nothing — otherwise the commit step is skipped and
+  // the scan window is thrown away.
+  if (scanError && cursor === startCursor) throw scanError;
 }
 
 main().catch((err) => { console.error('indexer failed:', err.message); process.exit(1); });
