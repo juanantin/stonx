@@ -10,12 +10,26 @@ window.STONKEX_CONFIG = {
   // $STONKEXSTR on Base — the token people buy, and the one the CA button copies.
   contractAddress: '0x80081d759E5e0154fB15D5ee8De5085D89E3dCcC',
 
-  // $STONKEX, the reward token. Only used to price "total distributed" in USD
-  // when the rewards source doesn't already give a USD figure.
-  rewardTokenAddress: null,
+  // $STONKEX, the reward token — confirmed as the `quote` side of this token's
+  // pair in the /api/coins listing, where the same address is "The Stonks
+  // Exchange" (STONKEX). Used to price "total distributed" in USD when the
+  // rewards source doesn't already give a USD figure.
+  rewardTokenAddress: '0x5ab000ff9B9FfE0349CE5ffA5fD86f217C3680F5',
 
   chain: 'base',    // DexScreener chain slug
   chainId: 8453,    // EVM chain id
+
+  /* Related contracts, from thestonks.exchange's own APIs. Recorded here for
+     reference — nothing reads them yet.
+       pool         the STONKEXSTR/STONKEX pool           (/api/coins)
+       feeLocker    where trading fees accrue             (/api/coins)
+       rewardsIndex the "rewards" routing target for this
+                    token, i.e. the distributor           (/api/fee-routing) */
+  contracts: {
+    pool: '0x550b95fcb0e309c552FAe9670b1A514D443CA463',
+    feeLocker: '0x71D1D363176723f85d98B8B430DF33cde89f0A7f',
+    rewardsIndex: '0xf01a4dabfd54d1A6a1812a95F7151e8DA851DE2E',
+  },
 
   /* ---- Links ---------------------------------------------------------- */
 
@@ -62,12 +76,25 @@ window.STONKEX_CONFIG = {
     /* Rewards figures — total fees collected and total $STONKEX distributed.
        These are project numbers, so they come from the project's own API.
 
-       ▸ SET `url` TO THE JSON ENDPOINT that backs
-         https://www.thestonks.exchange/token/<contract>
-         (open that page, DevTools ▸ Network ▸ Fetch/XHR, and copy the request
-         that carries the reward totals).
+       ▸ SET `url` TO THE JSON ENDPOINT that carries the reward totals.
+         Pass one URL or an array of them; each is read through `fields` below
+         and the first source to yield a number for a metric wins.
 
-       `fields` maps our metric names onto that response. Values are dot-paths,
+       These thestonks.exchange endpoints have been checked and do NOT carry the
+       totals — don't bother pointing at them again:
+         /api/kols/airdrops?token=<ca>   KOL airdrops; empty for this token
+         /api/fee-routing?pairs=<ca>:<feeLocker>
+                                         routing config only — it is what told
+                                         us fees route to "rewards" via the
+                                         index contract recorded above
+         /api/coins                      token metadata + supply, no totals
+
+       The token page also issues Alchemy JSON-RPC calls, so the figures it
+       renders are likely read straight off the rewards-index contract rather
+       than served by an API. If so, they need either an endpoint that exposes
+       them or an indexer — a browser cannot sum transfer logs over Base history.
+
+       `fields` maps our metric names onto the response. Values are dot-paths,
        so 'data.stats.totalFeesUsd' and 'rewards.0.amount' both work. Several
        common spellings are listed per metric — the first one that resolves to a
        number wins, so you can usually just add yours to the front of the list.
@@ -76,7 +103,7 @@ window.STONKEX_CONFIG = {
        it directly. If it doesn't, proxy it from your own domain.              */
     rewards: {
       enabled: true,
-      url: null,
+      url: null,        // string, or an array of strings
 
       fields: {
         totalFeesCollected: [

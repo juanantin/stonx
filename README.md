@@ -42,6 +42,20 @@ renders as `—` rather than as a number that isn't real.
 | Total fees collected | project rewards API | **needs `sources.rewards.url`** |
 | Total $STONKEX distributed | project rewards API | **needs `sources.rewards.url`** |
 
+### Addresses
+
+| | |
+|---|---|
+| `$STONKEXSTR` | `0x80081d759E5e0154fB15D5ee8De5085D89E3dCcC` |
+| `$STONKEX` (reward token) | `0x5ab000ff9B9FfE0349CE5ffA5fD86f217C3680F5` |
+| Pool | `0x550b95fcb0e309c552FAe9670b1A514D443CA463` |
+| Fee locker | `0x71D1D363176723f85d98B8B430DF33cde89f0A7f` |
+| Rewards index | `0xf01a4dabfd54d1A6a1812a95F7151e8DA851DE2E` |
+
+The reward token is the `quote` side of this token's pair in `/api/coins`, where
+the same address is listed as "The Stonks Exchange" (STONKEX) — note a second,
+earlier token also carries that name, so match on the address, not the symbol.
+
 ### Market data — DexScreener
 
 `GET https://api.dexscreener.com/latest/dex/tokens/<contract>`. Public, no key,
@@ -58,18 +72,30 @@ Set `sources.holders.mode` to `'etherscan'` to use the Etherscan V2 multichain A
 instead — note its `tokenholdercount` action requires a paid Etherscan plan, and
 you must supply `sources.holders.etherscanApiKey`.
 
-### Rewards — the project's own API
+### Rewards — still unsourced
 
 Fees collected and `$STONKEX` distributed are project figures that no explorer
-knows. Point `sources.rewards.url` at the JSON endpoint behind
-<https://www.thestonks.exchange/token/0x80081d759E5e0154fB15D5ee8De5085D89E3dCcC>:
+knows, and they are the one thing still missing. Set `sources.rewards.url` to the
+JSON endpoint that carries them — one URL, or an array of them, each read through
+`sources.rewards.fields`.
 
-1. open that page,
-2. DevTools ▸ Network ▸ Fetch/XHR,
-3. reload, and find the request carrying the reward totals,
-4. copy its URL into `sources.rewards.url`.
+These thestonks.exchange endpoints have been checked and do **not** carry the
+totals:
 
-`sources.rewards.fields` maps our metric names onto that response using dot-paths
+| Endpoint | What it returns |
+|---|---|
+| `/api/kols/airdrops?token=<ca>` | KOL airdrops — empty for this token |
+| `/api/fee-routing?pairs=<ca>:<feeLocker>` | routing config only |
+| `/api/coins` | token metadata and supply |
+
+`fee-routing` did establish that this token's fees route to `rewards` via index
+contract `0xf01a4dab…51DE2E`, and the token page also issues Alchemy JSON-RPC
+calls — so the figures it renders are probably read straight off that contract
+rather than served by an API. If that's the case they need either an endpoint
+that exposes them or an indexer; a browser cannot sum transfer logs across Base
+history.
+
+`sources.rewards.fields` maps our metric names onto the response using dot-paths
 (`data.stats.totalFeesUsd`, `rewards.0.amount`). Several common spellings are
 listed per metric and the first that resolves to a number wins, so usually you
 just add the response's own key to the front of a list.
@@ -77,8 +103,8 @@ just add the response's own key to the front of a list.
 The endpoint must send permissive CORS headers, since the browser calls it
 directly. If it doesn't, proxy it from your own domain.
 
-If it returns tokens but no USD figure for them, set `rewardTokenAddress` to the
-`$STONKEX` contract and the USD value is derived from its live DexScreener price.
+If it returns tokens but no USD figure for them, the USD value is derived from
+the live DexScreener price of `rewardTokenAddress`.
 
 ### Debugging
 

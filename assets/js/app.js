@@ -348,48 +348,66 @@
       }));
   }
 
-  /* Project rewards API — fees collected, $STONKEX distributed. */
+  /* Project rewards API — fees collected, $STONKEX distributed.
+     Takes one URL or several; each is read through the same field map and the
+     first to yield a number for a metric wins. */
   function sourceRewards() {
     var cfg = SRC.rewards || {};
     if (cfg.enabled === false || !cfg.url) return Promise.resolve(null);
 
-    return softly('rewards', fetchJson(cfg.url).then(function (d) {
-      var fields = cfg.fields || {};
-      var out = {};
+    var urls = (typeof cfg.url === 'string' ? [cfg.url] : cfg.url) || [];
 
-      var map = {
-        totalFeesCollected: 'fees',
-        totalDistributed: 'distributed',
-        totalDistributedUsd: 'distributedUsd',
-        holders: 'holders',
-        marketCap: 'marketCap',
-        liquidity: 'liquidity',
-        volume24h: 'volume24h',
-      };
-
-      Object.keys(map).forEach(function (from) {
-        var n = firstNumber(d, fields[from]);
-        if (n !== null) out[map[from]] = n;
-      });
-
-      // Optional history, oldest → newest.
-      var hist = pick(d, 'history') || pick(d, 'data.history');
-      if (hist && typeof hist === 'object') {
-        Object.keys(hist).forEach(function (k) {
-          var series = hist[k];
-          if (!Array.isArray(series) || series.length < 3) return;
-          var vals = series.map(function (p) {
-            return Array.isArray(p) ? num(p[1]) : (p && typeof p === 'object' ? num(p.value) : num(p));
-          }).filter(function (v) { return v !== null; });
-          if (vals.length >= 3) { vals.fromApi = true; sparkData[k] = vals; }
+    return Promise.all(urls.map(function (url) {
+      return softly('rewards:' + url, fetchJson(url).then(function (d) { return readRewards(cfg, d); }));
+    })).then(function (parts) {
+      var merged = null;
+      parts.forEach(function (part) {
+        if (!part) return;
+        merged = merged || {};
+        Object.keys(part).forEach(function (k) {
+          if (merged[k] === undefined) merged[k] = part[k];   // first source wins
         });
-      }
+      });
+      return merged;
+    });
+  }
 
-      if (out.distributedUsd === undefined) {
-        log('rewards', 'no USD figure for distributed — set rewardTokenAddress to derive one');
-      }
-      return out;
-    }));
+  function readRewards(cfg, d) {
+    var fields = cfg.fields || {};
+    var out = {};
+
+    var map = {
+      totalFeesCollected: 'fees',
+      totalDistributed: 'distributed',
+      totalDistributedUsd: 'distributedUsd',
+      holders: 'holders',
+      marketCap: 'marketCap',
+      liquidity: 'liquidity',
+      volume24h: 'volume24h',
+    };
+
+    Object.keys(map).forEach(function (from) {
+      var n = firstNumber(d, fields[from]);
+      if (n !== null) out[map[from]] = n;
+    });
+
+    // Optional history, oldest → newest.
+    var hist = pick(d, 'history') || pick(d, 'data.history');
+    if (hist && typeof hist === 'object') {
+      Object.keys(hist).forEach(function (k) {
+        var series = hist[k];
+        if (!Array.isArray(series) || series.length < 3) return;
+        var vals = series.map(function (p) {
+          return Array.isArray(p) ? num(p[1]) : (p && typeof p === 'object' ? num(p.value) : num(p));
+        }).filter(function (v) { return v !== null; });
+        if (vals.length >= 3) { vals.fromApi = true; sparkData[k] = vals; }
+      });
+    }
+
+    if (out.distributedUsd === undefined) {
+      log('rewards', 'no USD figure for distributed — deriving from rewardTokenAddress price');
+    }
+    return out;
   }
 
   /* Price the reward token, to turn distributed tokens into USD. */
