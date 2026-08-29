@@ -6,7 +6,9 @@ name: Index rewards
 
 on:
   schedule:
-    - cron: '*/15 * * * *'
+    # Deliberately off the :00/:15/:30/:45 boundary — GitHub's scheduler is
+    # heavily oversubscribed there and delays runs the longest.
+    - cron: '7,22,37,52 * * * *'
   workflow_dispatch:          # lets you kick off a run by hand
 
 concurrency:
