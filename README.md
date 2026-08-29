@@ -28,52 +28,78 @@ images/               branding
 - **Ecosystem** — the [The Stonks Exchange](https://www.thestonks.exchange/) and
   [Stockify](https://www.stockify.finance/) lockups, each one the link itself.
 
-## Setup
+## Data sources
 
-Everything configurable lives in `config.js`.
+Everything configurable lives in `config.js`. Each source fills in the fields it
+knows about and they merge in order, so a later source overrides an earlier one.
+Whatever no source provides falls back to `stats`, and anything still missing
+renders as `—` rather than as a number that isn't real.
 
-### 1. Set the contract address
+| Metric | Source | Status |
+|---|---|---|
+| Market cap, liquidity, 24h volume | DexScreener | live, no key |
+| Holders | Base Blockscout | live, no key |
+| Total fees collected | project rewards API | **needs `sources.rewards.url`** |
+| Total $STONKEX distributed | project rewards API | **needs `sources.rewards.url`** |
 
-```js
-contractAddress: '0x…',   // $STONKEXSTR on Base — this is what the CA button copies
-rewardTokenAddress: null, // $STONKEX, only used to price "total distributed" in USD
-```
+### Market data — DexScreener
 
-The chart button auto-builds a DexScreener link from the contract address. Set
-`links.chart` to override it with Dexscreener, DexTools, or anything else.
+`GET https://api.dexscreener.com/latest/dex/tokens/<contract>`. Public, no key,
+CORS-enabled. Of the pairs it returns, the deepest-liquidity one on `chain` is
+used; `marketCap` is preferred over `fdv`.
 
-### 2. Wire up the data
+### Holders — Blockscout
 
-Market cap, liquidity, 24h volume and the `$STONKEX` price come from the public
-DexScreener API automatically — no key, nothing to host. Set `useDexScreener: false`
-to turn that off.
+DexScreener does not report holder counts, so they come from
+`https://base.blockscout.com/api/v2/tokens/<contract>` (free, no key). Blockscout
+has shipped the field as both `holders` and `holders_count`; both are read.
 
-Fees collected, tokens distributed and the holder count can't be read from a DEX,
-so they come from your own endpoint. Point `statsEndpoint` at a URL returning:
+Set `sources.holders.mode` to `'etherscan'` to use the Etherscan V2 multichain API
+instead — note its `tokenholdercount` action requires a paid Etherscan plan, and
+you must supply `sources.holders.etherscanApiKey`.
 
-```json
-{
-  "totalFeesCollected": 2845632.78,
-  "totalDistributed": 12856324.68,
-  "totalDistributedUsd": 3128463.21,
-  "holders": 8942,
-  "history": { "fees": [12, 15, 14, "…12 points"] }
-}
-```
+### Rewards — the project's own API
 
-Every field is optional — whatever you send overrides the DexScreener value or the
-fallback; whatever you leave out falls back. The endpoint must send permissive CORS
-headers, since the browser calls it directly. `refreshSeconds` controls how often
-the dashboard re-polls (default 60).
+Fees collected and `$STONKEX` distributed are project figures that no explorer
+knows. Point `sources.rewards.url` at the JSON endpoint behind
+<https://www.thestonks.exchange/token/0x80081d759E5e0154fB15D5ee8De5085D89E3dCcC>:
 
-### 3. Replace the fallback numbers
+1. open that page,
+2. DevTools ▸ Network ▸ Fetch/XHR,
+3. reload, and find the request carrying the reward totals,
+4. copy its URL into `sources.rewards.url`.
 
-The `stats` object holds the values shown before the first fetch resolves and
-whenever a source is unreachable.
+`sources.rewards.fields` maps our metric names onto that response using dot-paths
+(`data.stats.totalFeesUsd`, `rewards.0.amount`). Several common spellings are
+listed per metric and the first that resolves to a number wins, so usually you
+just add the response's own key to the front of a list.
 
-> ⚠️ **The `history` arrays are sample shapes**, there only so the sparklines render
-> like the design out of the box. They are decorative until you serve real series
-> from `statsEndpoint.history`. Replace them or the trend lines mean nothing.
+The endpoint must send permissive CORS headers, since the browser calls it
+directly. If it doesn't, proxy it from your own domain.
+
+If it returns tokens but no USD figure for them, set `rewardTokenAddress` to the
+`$STONKEX` contract and the USD value is derived from its live DexScreener price.
+
+### Debugging
+
+Append `?debug=1` to the URL. Every source logs its raw response and the merged
+result to the console, so you can see exactly which one supplied each number.
+
+`refreshSeconds` controls the poll interval (default 60).
+
+## Sparklines
+
+Trend lines are drawn from real observations only:
+
+1. a `history` object on the rewards response, if it sends one —
+   `{ "marketCap": [ … ], "holders": [ … ] }`, oldest to newest; or
+2. a rolling series the browser records as the page refreshes, kept in
+   `localStorage` (`historyPoints` observations per metric, default 24).
+
+A tile with fewer than three real points draws no line, so a first-time visitor
+sees the numbers before the trends. Set `useSample: true` to draw the placeholder
+shapes in `sampleHistory` instead — they are decorative, not data, so use that
+only for screenshots.
 
 ## Running it
 

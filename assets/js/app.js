@@ -1,6 +1,10 @@
 /* ==========================================================================
    STONKEX STRATEGY — app
    Contract-address copy, live dashboard, sparklines.
+
+   Data flow: each source in CONFIG.sources returns the fields it knows about;
+   they are merged in order, so a later source overrides an earlier one. Add
+   ?debug=1 to the URL to log every raw source response to the console.
    ========================================================================== */
 
 (function () {
@@ -8,6 +12,14 @@
 
   var CFG = window.STONKEX_CONFIG || {};
   var LINKS = CFG.links || {};
+  var SRC = CFG.sources || {};
+  var DEBUG = /[?&]debug=1\b/.test(location.search);
+
+  var METRICS = ['fees', 'distributed', 'distributedUsd', 'holders', 'marketCap', 'liquidity', 'volume24h'];
+
+  function log() {
+    if (DEBUG && window.console) console.log.apply(console, ['[stonkex]'].concat([].slice.call(arguments)));
+  }
 
   /* ---------------------------------------------------------------------
      Formatting
@@ -20,7 +32,6 @@
   function amount(n) { return nf2.format(n); }
   function count(n) { return nf0.format(Math.round(n)); }
 
-  /* Each tile knows how to render its own number. */
   var FORMATTERS = {
     fees: usd,
     distributed: amount,
@@ -30,6 +41,44 @@
     liquidity: usd,
     volume24h: usd,
   };
+
+  /* ---------------------------------------------------------------------
+     Small helpers
+     --------------------------------------------------------------------- */
+
+  function num(v) {
+    if (typeof v === 'string') v = v.replace(/,/g, '').trim();
+    var n = typeof v === 'number' ? v : parseFloat(v);
+    return typeof n === 'number' && isFinite(n) ? n : null;
+  }
+
+  // Read a dot-path ('data.stats.fees', 'pairs.0.priceUsd') out of an object.
+  function pick(obj, path) {
+    var parts = String(path).split('.');
+    var cur = obj;
+    for (var i = 0; i < parts.length; i++) {
+      if (cur == null) return undefined;
+      cur = cur[parts[i]];
+    }
+    return cur;
+  }
+
+  // First path in the list that resolves to a usable number.
+  function firstNumber(obj, paths) {
+    var list = typeof paths === 'string' ? [paths] : (paths || []);
+    for (var i = 0; i < list.length; i++) {
+      var n = num(pick(obj, list[i]));
+      if (n !== null) return n;
+    }
+    return null;
+  }
+
+  function fetchJson(url) {
+    return fetch(url, { headers: { accept: 'application/json' } }).then(function (r) {
+      if (!r.ok) throw new Error(url + ' → HTTP ' + r.status);
+      return r.json();
+    });
+  }
 
   /* ---------------------------------------------------------------------
      Contract address + links
@@ -92,10 +141,7 @@
       }
 
       if (navigator.clipboard && window.isSecureContext) {
-        navigator.clipboard.writeText(address).then(
-          function () { flashToast('COPIED!'); },
-          fallback
-        );
+        navigator.clipboard.writeText(address).then(function () { flashToast('COPIED!'); }, fallback);
       } else {
         fallback();
       }
@@ -108,10 +154,7 @@
      2px line, round caps, ~10% area wash, one end-marker with a surface ring.
      --------------------------------------------------------------------- */
 
-  var SPARK_COLORS = {
-    blue: '#1f55f0',
-    green: '#2eb135',
-  };
+  var SPARK_COLORS = { blue: '#1f55f0', green: '#2eb135' };
 
   /* Cardinal spline through the points, so the trend reads as a curve
      rather than a zig-zag. */
@@ -141,10 +184,13 @@
   var sparkSeq = 0;
 
   function drawSpark(host, series, colorKey) {
+    // Fewer than three real observations isn't a trend — draw nothing.
+    if (!series || series.length < 3) { host.innerHTML = ''; return; }
+
     var cs = getComputedStyle(host);
     var w = host.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
     var h = host.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
-    if (!(w > 0) || !(h > 0) || !series || series.length < 2) return;
+    if (!(w > 0) || !(h > 0)) return;
 
     var color = SPARK_COLORS[colorKey] || SPARK_COLORS.blue;
     var padY = 10;
@@ -179,7 +225,7 @@
   }
 
   var sparkHosts = Array.prototype.slice.call(document.querySelectorAll('[data-spark]'));
-  var sparkData = Object.assign({}, CFG.history || {});
+  var sparkData = CFG.useSample ? Object.assign({}, CFG.sampleHistory || {}) : {};
 
   function renderSparks() {
     sparkHosts.forEach(function (host) {
@@ -192,7 +238,167 @@
     sparkHosts.forEach(function (host) { ro.observe(host); });
   } else {
     window.addEventListener('resize', renderSparks);
-    renderSparks();
+  }
+
+  /* ---------------------------------------------------------------------
+     Rolling history
+     Real observations this browser has seen, so the trend lines mean
+     something even when the API sends no history of its own.
+     --------------------------------------------------------------------- */
+
+  var STORE_KEY = 'stonkex:history:v1';
+  var MIN_GAP_MS = 45000;
+
+  function readStore() {
+    try { return JSON.parse(localStorage.getItem(STORE_KEY)) || {}; }
+    catch (e) { return {}; }
+  }
+
+  function recordHistory(stats) {
+    var cap = Number(CFG.historyPoints) || 24;
+    var now = Date.now();
+    var store = readStore();
+
+    METRICS.forEach(function (key) {
+      var v = stats[key];
+      if (typeof v !== 'number' || !isFinite(v)) return;
+
+      var series = Array.isArray(store[key]) ? store[key] : [];
+      var last = series[series.length - 1];
+      if (last && now - last[0] < MIN_GAP_MS) series.pop();   // replace, don't stack
+      series.push([now, v]);
+      store[key] = series.slice(-cap);
+    });
+
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(store)); } catch (e) { /* private mode */ }
+
+    // API-supplied history wins; otherwise use what we've recorded.
+    METRICS.forEach(function (key) {
+      if (sparkData[key] && sparkData[key].fromApi) return;
+      if (Array.isArray(store[key])) sparkData[key] = store[key].map(function (p) { return p[1]; });
+    });
+  }
+
+  /* ---------------------------------------------------------------------
+     Sources
+     Each returns a partial stats object (or {}), and never rejects.
+     --------------------------------------------------------------------- */
+
+  function softly(name, promise) {
+    return promise.then(
+      function (v) { log(name, 'ok', v); return v; },
+      function (e) { log(name, 'failed', e && e.message); return null; }
+    );
+  }
+
+  /* Pick the deepest-liquidity pair for a token on the configured chain. */
+  function bestPair(pairs, chain) {
+    return (pairs || [])
+      .filter(function (p) { return !chain || p.chainId === chain; })
+      .sort(function (a, b) {
+        return ((b.liquidity && b.liquidity.usd) || 0) - ((a.liquidity && a.liquidity.usd) || 0);
+      })[0] || null;
+  }
+
+  function dexPair(addr) {
+    var cfg = SRC.dexscreener || {};
+    if (cfg.enabled === false || !addr) return Promise.resolve(null);
+    return softly('dexscreener:' + addr,
+      fetchJson('https://api.dexscreener.com/latest/dex/tokens/' + encodeURIComponent(addr))
+        .then(function (data) { return bestPair(data && data.pairs, CFG.chain); }));
+  }
+
+  /* Market cap, liquidity, 24h volume. */
+  function sourceDexScreener() {
+    return dexPair(address).then(function (pair) {
+      if (!pair) return null;
+      var out = {};
+      var mc = num(pair.marketCap);
+      if (mc === null) mc = num(pair.fdv);
+      if (mc !== null) out.marketCap = mc;
+      if (pair.liquidity && num(pair.liquidity.usd) !== null) out.liquidity = num(pair.liquidity.usd);
+      if (pair.volume && num(pair.volume.h24) !== null) out.volume24h = num(pair.volume.h24);
+      return out;
+    });
+  }
+
+  /* Holder count, from a Base explorer — DexScreener doesn't report it. */
+  function sourceHolders() {
+    var cfg = SRC.holders || {};
+    if (cfg.enabled === false || cfg.mode === 'none' || !address) return Promise.resolve(null);
+
+    if (cfg.mode === 'etherscan') {
+      if (!cfg.etherscanApiKey) { log('holders', 'etherscan mode needs an API key'); return Promise.resolve(null); }
+      var esUrl = 'https://api.etherscan.io/v2/api?chainid=' + (CFG.chainId || 8453) +
+        '&module=token&action=tokenholdercount&contractaddress=' + encodeURIComponent(address) +
+        '&apikey=' + encodeURIComponent(cfg.etherscanApiKey);
+      return softly('holders:etherscan', fetchJson(esUrl).then(function (d) {
+        if (String(d && d.status) !== '1') throw new Error(d && (d.result || d.message) || 'bad response');
+        var n = num(d.result);
+        return n === null ? null : { holders: n };
+      }));
+    }
+
+    var base = (cfg.blockscoutBase || 'https://base.blockscout.com').replace(/\/+$/, '');
+    return softly('holders:blockscout',
+      fetchJson(base + '/api/v2/tokens/' + encodeURIComponent(address)).then(function (d) {
+        // Blockscout has used both spellings across versions.
+        var n = firstNumber(d, ['holders_count', 'holders']);
+        return n === null ? null : { holders: n };
+      }));
+  }
+
+  /* Project rewards API — fees collected, $STONKEX distributed. */
+  function sourceRewards() {
+    var cfg = SRC.rewards || {};
+    if (cfg.enabled === false || !cfg.url) return Promise.resolve(null);
+
+    return softly('rewards', fetchJson(cfg.url).then(function (d) {
+      var fields = cfg.fields || {};
+      var out = {};
+
+      var map = {
+        totalFeesCollected: 'fees',
+        totalDistributed: 'distributed',
+        totalDistributedUsd: 'distributedUsd',
+        holders: 'holders',
+        marketCap: 'marketCap',
+        liquidity: 'liquidity',
+        volume24h: 'volume24h',
+      };
+
+      Object.keys(map).forEach(function (from) {
+        var n = firstNumber(d, fields[from]);
+        if (n !== null) out[map[from]] = n;
+      });
+
+      // Optional history, oldest → newest.
+      var hist = pick(d, 'history') || pick(d, 'data.history');
+      if (hist && typeof hist === 'object') {
+        Object.keys(hist).forEach(function (k) {
+          var series = hist[k];
+          if (!Array.isArray(series) || series.length < 3) return;
+          var vals = series.map(function (p) {
+            return Array.isArray(p) ? num(p[1]) : (p && typeof p === 'object' ? num(p.value) : num(p));
+          }).filter(function (v) { return v !== null; });
+          if (vals.length >= 3) { vals.fromApi = true; sparkData[k] = vals; }
+        });
+      }
+
+      if (out.distributedUsd === undefined) {
+        log('rewards', 'no USD figure for distributed — set rewardTokenAddress to derive one');
+      }
+      return out;
+    }));
+  }
+
+  /* Price the reward token, to turn distributed tokens into USD. */
+  function sourceRewardPrice() {
+    if (!CFG.rewardTokenAddress) return Promise.resolve(null);
+    return dexPair(CFG.rewardTokenAddress).then(function (pair) {
+      var price = pair ? num(pair.priceUsd) : null;
+      return price === null ? null : { _rewardPrice: price };
+    });
   }
 
   /* ---------------------------------------------------------------------
@@ -210,7 +416,14 @@
 
   function setValue(key, target) {
     var node = valueNodes[key];
-    if (!node || typeof target !== 'number' || !isFinite(target)) return;
+    if (!node) return;
+
+    if (typeof target !== 'number' || !isFinite(target)) {
+      node.textContent = '—';                       // no source for this one yet
+      node.classList.add('is-empty');
+      return;
+    }
+    node.classList.remove('is-empty');
 
     var fmt = FORMATTERS[key] || amount;
     var from = typeof shown[key] === 'number' ? shown[key] : 0;
@@ -234,15 +447,17 @@
   }
 
   var painted = false;
+  var usdChip = document.querySelector('.stat__chip');
 
   function paint(stats) {
     painted = true;
-    ['fees', 'distributed', 'distributedUsd', 'holders', 'marketCap', 'liquidity', 'volume24h']
-      .forEach(function (key) { setValue(key, stats[key]); });
+    METRICS.forEach(function (key) { setValue(key, stats[key]); });
+    // The "… USD" chip has nothing to say without a USD figure.
+    if (usdChip) usdChip.hidden = typeof stats.distributedUsd !== 'number';
   }
 
   /* ---------------------------------------------------------------------
-     Data
+     Load
      --------------------------------------------------------------------- */
 
   var note = document.getElementById('dash-note');
@@ -250,127 +465,76 @@
   function baseStats() {
     var s = CFG.stats || {};
     return {
-      fees: s.totalFeesCollected,
-      distributed: s.totalDistributed,
-      distributedUsd: s.totalDistributedUsd,
-      holders: s.holders,
-      marketCap: s.marketCap,
-      liquidity: s.liquidity,
-      volume24h: s.volume24h,
+      fees: num(s.totalFeesCollected),
+      distributed: num(s.totalDistributed),
+      distributedUsd: num(s.totalDistributedUsd),
+      holders: num(s.holders),
+      marketCap: num(s.marketCap),
+      liquidity: num(s.liquidity),
+      volume24h: num(s.volume24h),
     };
   }
 
-  function num(v) {
-    var n = typeof v === 'string' ? parseFloat(v) : v;
-    return typeof n === 'number' && isFinite(n) ? n : null;
-  }
-
-  /* Pick the deepest-liquidity pair for a token on the configured chain. */
-  function bestPair(pairs, chain) {
-    return (pairs || [])
-      .filter(function (p) { return !chain || p.chainId === chain; })
-      .sort(function (a, b) {
-        return ((b.liquidity && b.liquidity.usd) || 0) - ((a.liquidity && a.liquidity.usd) || 0);
-      })[0] || null;
-  }
-
-  function fetchJson(url) {
-    return fetch(url, { headers: { accept: 'application/json' } }).then(function (r) {
-      if (!r.ok) throw new Error('HTTP ' + r.status);
-      return r.json();
-    });
-  }
-
-  function fetchDex(addr) {
-    if (!CFG.useDexScreener || !addr) return Promise.resolve(null);
-    return fetchJson('https://api.dexscreener.com/latest/dex/tokens/' + encodeURIComponent(addr))
-      .then(function (data) { return bestPair(data && data.pairs, CFG.chain); });
-  }
-
-  function fetchProject() {
-    if (!CFG.statsEndpoint) return Promise.resolve(null);
-    return fetchJson(CFG.statsEndpoint);
-  }
-
   function load() {
-    var stats = baseStats();
-
+    // Order matters: later sources override earlier ones.
     return Promise.all([
-      fetchDex(address).catch(function () { return null; }),
-      fetchDex(CFG.rewardTokenAddress).catch(function () { return null; }),
-      fetchProject().catch(function () { return null; }),
-    ]).then(function (res) {
-      var pair = res[0];
-      var rewardPair = res[1];
-      var api = res[2] || {};
-      var live = false;
+      sourceDexScreener(),
+      sourceHolders(),
+      sourceRewardPrice(),
+      sourceRewards(),
+    ]).then(function (results) {
+      var stats = baseStats();
+      var live = 0;
+      var rewardPrice = null;
 
-      if (pair) {
-        live = true;
-        var mc = num(pair.marketCap) || num(pair.fdv);
-        if (mc !== null) stats.marketCap = mc;
-        if (pair.liquidity && num(pair.liquidity.usd) !== null) stats.liquidity = num(pair.liquidity.usd);
-        if (pair.volume && num(pair.volume.h24) !== null) stats.volume24h = num(pair.volume.h24);
-      }
-
-      // Project API wins over DexScreener where it supplies a value.
-      var map = {
-        totalFeesCollected: 'fees',
-        totalDistributed: 'distributed',
-        totalDistributedUsd: 'distributedUsd',
-        holders: 'holders',
-        marketCap: 'marketCap',
-        liquidity: 'liquidity',
-        volume24h: 'volume24h',
-      };
-      Object.keys(map).forEach(function (k) {
-        var v = num(api[k]);
-        if (v !== null) { stats[map[k]] = v; live = true; }
+      results.forEach(function (part) {
+        if (!part) return;
+        if (part._rewardPrice) { rewardPrice = part._rewardPrice; return; }
+        var got = false;
+        Object.keys(part).forEach(function (k) {
+          if (typeof part[k] === 'number' && isFinite(part[k])) { stats[k] = part[k]; got = true; }
+        });
+        if (got) live++;
       });
 
-      // Derive the USD value of distributed $STONKEX from its live price
-      // when the API did not supply one.
-      if (num(api.totalDistributedUsd) === null) {
-        var price = rewardPair ? num(rewardPair.priceUsd) : null;
-        if (price !== null && typeof stats.distributed === 'number') {
-          stats.distributedUsd = stats.distributed * price;
-        }
+      // Derive the USD value of distributed $STONKEX if nothing supplied one.
+      if (stats.distributedUsd === null && rewardPrice !== null && typeof stats.distributed === 'number') {
+        stats.distributedUsd = stats.distributed * rewardPrice;
       }
 
-      if (api.history && typeof api.history === 'object') {
-        Object.keys(api.history).forEach(function (k) {
-          if (Array.isArray(api.history[k]) && api.history[k].length > 1) {
-            sparkData[k] = api.history[k];
-          }
-        });
-        renderSparks();
-      }
-
+      log('merged', stats);
       paint(stats);
+      recordHistory(stats);
+      renderSparks();
 
       if (note) {
         note.textContent = live
           ? 'Updated ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-          : 'Live data unavailable — showing last published figures.';
+          : 'Live data unavailable — retrying.';
       }
     });
   }
 
-  // The tiles blink a "…" placeholder until the first load resolves. If the
-  // network is slow or dead, fall back to the configured values rather than
-  // blinking forever.
+  /* ---------------------------------------------------------------------
+     Boot
+     Tiles blink a "…" placeholder until the first load resolves. If the
+     network is slow or dead, fall back rather than blinking forever.
+     --------------------------------------------------------------------- */
+
+  // Seed the sparklines from anything this browser already recorded.
+  recordHistory({});
   renderSparks();
 
   var fallbackTimer = setTimeout(function () {
     if (!painted) paint(baseStats());
-  }, 4000);
+  }, 6000);
 
-  load()['catch'](function () {})
+  load()['catch'](function (e) { log('load failed', e && e.message); })
     .then(function () {
       clearTimeout(fallbackTimer);
       if (!painted) paint(baseStats());
     });
 
   var every = Number(CFG.refreshSeconds) || 0;
-  if (every > 0) setInterval(load, every * 1000);
+  if (every > 0) setInterval(function () { load()['catch'](function () {}); }, every * 1000);
 })();
