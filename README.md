@@ -129,9 +129,21 @@ The array is a fallback chain: the endpoint answers when it can, the file covers
 it when it doesn't. Add the response's own key names to the front of the matching
 list in `sources.rewards.fields` if they differ from the ones already there.
 
-**3. Index it yourself — [`worker/`](worker/).** A Cloudflare Worker that reads
-the totals off Base on a cron and serves exactly the JSON above. This is the only
-option that stays correct without anyone touching it.
+**3. Let GitHub Actions index it — no accounts, no infrastructure.**
+[`.github/workflows/index-rewards.yml`](.github/workflows/index-rewards.yml)
+runs [`scripts/index-rewards.mjs`](scripts/index-rewards.mjs) every 15 minutes,
+scans Base, and commits the refreshed `data/rewards.json` — the file the site
+already reads. It also counts holders, so that stops depending on explorers too.
+
+Nothing to set up: enable Actions on the repo and it runs. State lives in
+`data/rewards-state.json`, so each run resumes where the last stopped and a first
+backfill finishes over a few runs. Optionally set an `RPC_URL` secret to a
+private Base endpoint — the public one works but rate-limits, which only means
+the backfill takes longer. `workflow_dispatch` lets you trigger a run by hand.
+
+**4. Or run it as a Cloudflare Worker — [`worker/`](worker/).** Same scan logic,
+serving over HTTP instead of committing a file. Better if you want sub-minute
+freshness or would rather not commit state to the repo.
 
 It scans `eth_getLogs` for `$STONKEX` Transfer events, filtered by counterparty,
 from the token's launch block (**50530608**) forward — so the range is bounded,

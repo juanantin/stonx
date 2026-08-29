@@ -16,16 +16,16 @@
 
 <!-- favicon.ico sits at the root because browsers request /favicon.ico on their
      own, regardless of these tags. All generated from images/stkstr_icon.png. -->
-<link rel="icon" href="favicon.ico?v=2026-08-29.9" sizes="any">
-<link rel="icon" type="image/png" sizes="64x64" href="images/favicon.png?v=2026-08-29.9">
-<link rel="apple-touch-icon" href="images/apple-touch-icon.png?v=2026-08-29.9">
-<link rel="manifest" href="site.webmanifest?v=2026-08-29.9">
+<link rel="icon" href="favicon.ico?v=2026-08-29.10" sizes="any">
+<link rel="icon" type="image/png" sizes="64x64" href="images/favicon.png?v=2026-08-29.10">
+<link rel="apple-touch-icon" href="images/apple-touch-icon.png?v=2026-08-29.10">
+<link rel="manifest" href="site.webmanifest?v=2026-08-29.10">
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 
-<link rel="stylesheet" href="assets/css/styles.css?v=2026-08-29.9">
+<link rel="stylesheet" href="assets/css/styles.css?v=2026-08-29.10">
 </head>
 <body>
 
@@ -115,18 +115,6 @@
 
     <div class="stats" id="stats">
 
-      <!-- Total fees collected -->
-      <article class="stat" data-metric="fees">
-        <div class="stat__head">
-          <span class="stat__icon stat__icon--blue" aria-hidden="true">
-            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="currentColor"/><path d="M12 6.2v11.6M14.9 9.1a3.1 3.1 0 0 0-2.9-1.7c-1.7 0-2.9.9-2.9 2.3 0 3.2 6 1.7 6 4.8 0 1.4-1.3 2.4-3.1 2.4a3.4 3.4 0 0 1-3.2-1.9" fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round"/></svg>
-          </span>
-          <h2 class="stat__label">Total fees collected</h2>
-        </div>
-        <p class="stat__value" data-value="fees"><span class="dots" role="img" aria-label="Loading"><i></i><i></i><i></i></span></p>
-        <div class="stat__spark" data-spark="fees" data-color="blue" aria-hidden="true"></div>
-      </article>
-
       <!-- Total $STONKEX distributed -->
       <article class="stat" data-metric="distributed">
         <div class="stat__head">
@@ -140,52 +128,64 @@
         <div class="stat__spark" data-spark="distributed" data-color="green" aria-hidden="true"></div>
       </article>
 
+      <!-- Total fees collected -->
+      <article class="stat" data-metric="fees">
+        <div class="stat__head">
+          <span class="stat__icon stat__icon--blue" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="currentColor"/><path d="M12 6.2v11.6M14.9 9.1a3.1 3.1 0 0 0-2.9-1.7c-1.7 0-2.9.9-2.9 2.3 0 3.2 6 1.7 6 4.8 0 1.4-1.3 2.4-3.1 2.4a3.4 3.4 0 0 1-3.2-1.9" fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round"/></svg>
+          </span>
+          <h2 class="stat__label">Total fees collected</h2>
+        </div>
+        <p class="stat__value" data-value="fees"><span class="dots" role="img" aria-label="Loading"><i></i><i></i><i></i></span></p>
+        <div class="stat__spark" data-spark="fees" data-color="blue" aria-hidden="true"></div>
+      </article>
+
       <!-- Total holders -->
       <article class="stat" data-metric="holders">
         <div class="stat__head">
-          <span class="stat__icon stat__icon--blue" aria-hidden="true">
+          <span class="stat__icon stat__icon--green" aria-hidden="true">
             <svg viewBox="0 0 24 24"><circle cx="9" cy="8.4" r="3.4" fill="currentColor"/><circle cx="17" cy="9.4" r="2.6" fill="currentColor" opacity=".72"/><path d="M2.6 18.6c0-3.1 2.9-5 6.4-5s6.4 1.9 6.4 5v.8H2.6v-.8Z" fill="currentColor"/><path d="M17.1 14.1c2.6.2 4.3 1.8 4.3 4.3v1h-4.3v-5.3Z" fill="currentColor" opacity=".72"/></svg>
           </span>
           <h2 class="stat__label">Total holders</h2>
         </div>
         <p class="stat__value" data-value="holders"><span class="dots" role="img" aria-label="Loading"><i></i><i></i><i></i></span></p>
-        <div class="stat__spark" data-spark="holders" data-color="blue" aria-hidden="true"></div>
+        <div class="stat__spark" data-spark="holders" data-color="green" aria-hidden="true"></div>
       </article>
 
       <!-- Market cap -->
       <article class="stat" data-metric="marketCap">
         <div class="stat__head">
-          <span class="stat__icon stat__icon--green" aria-hidden="true">
+          <span class="stat__icon stat__icon--blue" aria-hidden="true">
             <svg viewBox="0 0 24 24"><rect x="3.4" y="13" width="4.2" height="7.6" rx="1.4" fill="currentColor"/><rect x="9.9" y="8.4" width="4.2" height="12.2" rx="1.4" fill="currentColor"/><rect x="16.4" y="3.4" width="4.2" height="17.2" rx="1.4" fill="currentColor"/></svg>
           </span>
           <h2 class="stat__label">Market cap</h2>
         </div>
         <p class="stat__value" data-value="marketCap"><span class="dots" role="img" aria-label="Loading"><i></i><i></i><i></i></span></p>
-        <div class="stat__spark" data-spark="marketCap" data-color="green" aria-hidden="true"></div>
+        <div class="stat__spark" data-spark="marketCap" data-color="blue" aria-hidden="true"></div>
       </article>
 
       <!-- Liquidity -->
       <article class="stat" data-metric="liquidity">
         <div class="stat__head">
-          <span class="stat__icon stat__icon--blue" aria-hidden="true">
+          <span class="stat__icon stat__icon--green" aria-hidden="true">
             <svg viewBox="0 0 24 24"><path d="M12 2.8s6.6 6.6 6.6 11a6.6 6.6 0 1 1-13.2 0c0-4.4 6.6-11 6.6-11Z" fill="currentColor"/></svg>
           </span>
           <h2 class="stat__label">Liquidity</h2>
         </div>
         <p class="stat__value" data-value="liquidity"><span class="dots" role="img" aria-label="Loading"><i></i><i></i><i></i></span></p>
-        <div class="stat__spark" data-spark="liquidity" data-color="blue" aria-hidden="true"></div>
+        <div class="stat__spark" data-spark="liquidity" data-color="green" aria-hidden="true"></div>
       </article>
 
       <!-- 24h volume -->
       <article class="stat" data-metric="volume24h">
         <div class="stat__head">
-          <span class="stat__icon stat__icon--green" aria-hidden="true">
+          <span class="stat__icon stat__icon--blue" aria-hidden="true">
             <svg viewBox="0 0 24 24"><path d="M3.4 16.2 9 10.6l3.6 3.6 5.4-5.4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M14.6 8.2h5v5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </span>
           <h2 class="stat__label">24h volume</h2>
         </div>
         <p class="stat__value" data-value="volume24h"><span class="dots" role="img" aria-label="Loading"><i></i><i></i><i></i></span></p>
-        <div class="stat__spark" data-spark="volume24h" data-color="green" aria-hidden="true"></div>
+        <div class="stat__spark" data-spark="volume24h" data-color="blue" aria-hidden="true"></div>
       </article>
 
     </div>
@@ -227,7 +227,7 @@
 
 <!-- ?v= is the cache buster: bump BUILD in both files on every deploy,
      or a CDN will keep serving the previous config.js and app.js. -->
-<script src="config.js?v=2026-08-29.9"></script>
-<script src="assets/js/app.js?v=2026-08-29.9"></script>
+<script src="config.js?v=2026-08-29.10"></script>
+<script src="assets/js/app.js?v=2026-08-29.10"></script>
 </body>
 </html>

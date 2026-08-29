@@ -187,8 +187,16 @@
   var sparkSeq = 0;
 
   function drawSpark(host, series, colorKey) {
-    // Fewer than three real observations isn't a trend — draw nothing.
-    if (!series || series.length < 3) { host.innerHTML = ''; return; }
+    var tile = host.closest ? host.closest('.stat') : null;
+
+    // Fewer than three real observations isn't a trend — draw nothing, and
+    // collapse the space so the tile doesn't sit half empty waiting for one.
+    if (!series || series.length < 3) {
+      host.innerHTML = '';
+      if (tile) tile.classList.add('stat--flat');
+      return;
+    }
+    if (tile) tile.classList.remove('stat--flat');
 
     var cs = getComputedStyle(host);
     var w = host.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);

@@ -24,8 +24,8 @@
 
   /* Shape */
   --r-pill:      999px;
-  --r-lg:        26px;
-  --r-md:        18px;
+  --r-lg:        22px;
+  --r-md:        16px;
 
   --shadow-sm:   0 1px 2px rgba(11,14,20,.05), 0 2px 8px rgba(11,14,20,.04);
   --shadow-md:   0 2px 4px rgba(11,14,20,.04), 0 12px 34px rgba(11,14,20,.06);
@@ -82,7 +82,7 @@ a { color: inherit; text-decoration: none; }
 .topbar {
   position: relative;
   z-index: 3;
-  padding: 22px 20px 4px;
+  padding: 16px 20px 4px;
 }
 
 .topbar__inner {
@@ -96,8 +96,8 @@ a { color: inherit; text-decoration: none; }
 }
 
 .topbar__logo {
-  width: 46px;
-  height: 46px;
+  width: 42px;
+  height: 42px;
   border-radius: 50%;
   border: 1px solid var(--line);
   background: var(--surface);
@@ -109,8 +109,8 @@ a { color: inherit; text-decoration: none; }
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  min-height: 46px;
-  padding: 0 22px;
+  min-height: 42px;
+  padding: 0 18px;
   border: 1px solid var(--line);
   border-radius: var(--r-pill);
   background: var(--surface);
@@ -193,10 +193,10 @@ a { color: inherit; text-decoration: none; }
   z-index: 1;
   max-width: var(--wrap);
   margin: 0 auto;
-  padding: 10px 20px 56px;
+  padding: 8px 20px 44px;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 22px;
+  gap: 16px;
 }
 
 .card {
@@ -230,13 +230,13 @@ a { color: inherit; text-decoration: none; }
    Dashboard
    ========================================================================== */
 
-.dashboard { padding: 34px clamp(16px, 3.4vw, 34px) 30px; }
+.dashboard { padding: 26px clamp(14px, 2.8vw, 28px) 22px; }
 
-.dashboard__head { text-align: center; margin-bottom: 26px; }
+.dashboard__head { text-align: center; margin-bottom: 20px; }
 
 .dashboard__title {
   margin: 0 0 8px;
-  font-size: clamp(21px, 3.1vw, 28px);
+  font-size: clamp(19px, 2.6vw, 24px);
   font-weight: 800;
   letter-spacing: -.015em;
   text-transform: uppercase;
@@ -253,14 +253,14 @@ a { color: inherit; text-decoration: none; }
 .stats {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
+  gap: 12px;
 }
 
 .stat {
   position: relative;
   display: flex;
   flex-direction: column;
-  padding: 20px 20px 0;
+  padding: 16px 16px 0;
   border: 1px solid var(--line-soft);
   border-radius: var(--r-md);
   background: var(--surface-2);
@@ -277,21 +277,21 @@ a { color: inherit; text-decoration: none; }
 .stat__head {
   display: flex;
   align-items: center;
-  gap: 11px;
-  min-height: 40px;
-  margin-bottom: 14px;
+  gap: 10px;
+  min-height: 34px;
+  margin-bottom: 10px;
 }
 
 .stat__icon {
-  width: 38px;
-  height: 38px;
+  width: 32px;
+  height: 32px;
   flex: none;
   display: grid;
   place-items: center;
   border-radius: 12px;
 }
 
-.stat__icon svg { width: 21px; height: 21px; }
+.stat__icon svg { width: 18px; height: 18px; }
 
 .stat__icon--blue  { background: var(--blue-tint);  color: var(--blue); }
 .stat__icon--green { background: var(--green-tint); color: var(--green); }
@@ -308,7 +308,7 @@ a { color: inherit; text-decoration: none; }
 
 .stat__value {
   margin: 0;
-  font-size: clamp(24px, 2.9vw, 31px);
+  font-size: clamp(21px, 2.4vw, 26px);
   font-weight: 800;
   letter-spacing: -.025em;
   line-height: 1.1;
@@ -323,8 +323,8 @@ a { color: inherit; text-decoration: none; }
 
 .stat__chip {
   align-self: flex-start;
-  margin: 11px 0 0;
-  padding: 5px 13px;
+  margin: 9px 0 0;
+  padding: 4px 11px;
   border: 1px solid #bfe7c2;
   border-radius: var(--r-pill);
   background: #f4fcf5;
@@ -344,13 +344,17 @@ a { color: inherit; text-decoration: none; }
    line up across a row even when one tile is taller. The padding is the
    guaranteed gap below the value; the JS draws into the content box. */
 .stat__spark {
-  margin: auto -20px 0;
-  padding-top: 18px;
-  height: 94px;
+  margin: auto -16px 0;
+  padding-top: 14px;
+  height: 76px;
   flex: none;
 }
 
 .stat__spark svg { width: 100%; height: 100%; display: block; }
+
+/* No series yet — drop the plot area rather than leave the tile half empty */
+.stat--flat .stat__spark { display: none; }
+.stat--flat { padding-bottom: 16px; }
 
 /* Values are numeric strings that swap in — keep them from reflowing */
 .stat__value, .stat__chip b { font-variant-numeric: proportional-nums; }
@@ -384,7 +388,7 @@ a { color: inherit; text-decoration: none; }
 .stat__chip b:has(.dots)::before { content: none; }
 
 .dashboard__note {
-  margin: 18px 0 0;
+  margin: 14px 0 0;
   text-align: center;
   font-size: 12.5px;
   color: var(--muted);
@@ -399,15 +403,15 @@ a { color: inherit; text-decoration: none; }
 .partners {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-  padding: 22px clamp(14px, 2.6vw, 26px);
+  gap: 8px;
+  padding: 16px clamp(12px, 2.2vw, 20px);
 }
 
 .partner {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 16px;
+  gap: 14px;
+  padding: 12px;
   border-radius: var(--r-md);
   transition: background .18s ease, transform .18s ease;
 }
@@ -415,8 +419,8 @@ a { color: inherit; text-decoration: none; }
 .partner:hover { background: #f4f7fd; transform: translateY(-1px); }
 
 .partner__art {
-  width: 86px;
-  height: 86px;
+  width: 68px;
+  height: 68px;
   flex: none;
   object-fit: contain;
 }
@@ -425,7 +429,7 @@ a { color: inherit; text-decoration: none; }
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 9px;
+  gap: 8px;
   min-width: 0;
 }
 
@@ -444,8 +448,8 @@ a { color: inherit; text-decoration: none; }
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 240px;   /* the two lockups differ in ratio — match the plates */
-  padding: 16px 26px;
+  min-width: 210px;   /* the two lockups differ in ratio — match the plates */
+  padding: 13px 20px;
   border: 1px solid var(--line);
   border-radius: 18px;
   background: var(--surface);
@@ -453,7 +457,7 @@ a { color: inherit; text-decoration: none; }
   transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
 }
 
-.partner__brand img { height: 38px; width: auto; }
+.partner__brand img { height: 32px; width: auto; }
 
 .partner:hover .partner__brand {
   transform: translateY(-2px);
@@ -497,7 +501,7 @@ a { color: inherit; text-decoration: none; }
 
   /* The page drops its side padding so the hero can run edge to edge;
      the cards carry their own inset instead. */
-  .page { padding: 8px 0 40px; gap: 14px; }
+  .page { padding: 6px 0 32px; gap: 11px; }
   .card, .foot { margin: 0 14px; }
 
   /* Hero fills the screen width and slightly overscans the banner's own
@@ -511,29 +515,30 @@ a { color: inherit; text-decoration: none; }
   }
 
   /* Two tiles per row, scaled down to suit */
-  .dashboard { padding: 24px 14px 22px; }
+  .dashboard { padding: 20px 12px 18px; }
   .dashboard__title { font-size: 19px; }
   .dashboard__sub { font-size: 13.5px; }
 
-  .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
 
-  .stat { padding: 13px 13px 0; border-radius: 15px; }
+  .stat { padding: 11px 11px 0; border-radius: 14px; }
   .stat__head { flex-direction: column; align-items: flex-start; gap: 8px; min-height: 0; margin-bottom: 10px; }
-  .stat__icon { width: 30px; height: 30px; border-radius: 9px; }
-  .stat__icon svg { width: 17px; height: 17px; }
+  .stat__icon { width: 27px; height: 27px; border-radius: 8px; }
+  .stat__icon svg { width: 15px; height: 15px; }
   .stat__label { font-size: 10.5px; letter-spacing: .03em; }
-  .stat__value { font-size: 17px; letter-spacing: -.03em; }
+  .stat__value { font-size: 16px; letter-spacing: -.03em; }
   .stat__chip { margin-top: 8px; padding: 4px 9px; font-size: 10.5px; }
-  .stat__spark { margin: auto -13px 0; padding-top: 14px; height: 62px; }
+  .stat__spark { margin: auto -11px 0; padding-top: 12px; height: 52px; }
+  .stat--flat { padding-bottom: 11px; }
 
   /* Ecosystem blocks centre up */
-  .partners { padding: 16px 12px; gap: 4px; }
-  .partner { flex-direction: column; align-items: center; text-align: center; gap: 12px; padding: 16px 10px; }
-  .partner__art { width: 78px; height: 78px; }
+  .partners { padding: 12px 10px; gap: 2px; }
+  .partner { flex-direction: column; align-items: center; text-align: center; gap: 10px; padding: 12px 8px; }
+  .partner__art { width: 62px; height: 62px; }
   .partner__copy { align-items: center; gap: 11px; }
   .partner__kicker { font-size: 11px; }
-  .partner__brand { min-width: 210px; padding: 14px 22px; }
-  .partner__brand img { height: 30px; }
+  .partner__brand { min-width: 190px; padding: 12px 18px; }
+  .partner__brand img { height: 27px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
