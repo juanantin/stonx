@@ -15,7 +15,8 @@
   var SRC = CFG.sources || {};
   var DEBUG = /[?&]debug=1\b/.test(location.search);
 
-  var METRICS = ['fees', 'distributed', 'distributedUsd', 'holders', 'marketCap', 'liquidity', 'volume24h'];
+  var METRICS = ['fees', 'distributed', 'distributedUsd', 'holders',
+                 'marketCap', 'liquidity', 'volume24h'];
 
   function log() {
     if (DEBUG && window.console) console.log.apply(console, ['[stonkex]'].concat([].slice.call(arguments)));
@@ -207,12 +208,21 @@
     var padY = 10;
     var min = Math.min.apply(null, series);
     var max = Math.max.apply(null, series);
-    var span = max - min || 1;
+
+    /* Scale against the level, not just the range. Normalising to min/max alone
+       turns a 0.1% wobble into a full-height cliff, which is how a barely-moving
+       total ends up looking like a crash. A series has to move ~4% of its own
+       magnitude to fill the tile; anything smaller reads as the near-flat line
+       it actually is. */
+    var mean = series.reduce(function (a, b) { return a + b; }, 0) / series.length;
+    var span = Math.max(max - min, Math.abs(mean) * 0.04, 1e-9);
+    var mid = (max + min) / 2;
+    var lo = mid - span / 2;
 
     var pts = series.map(function (v, i) {
       return {
         x: (i / (series.length - 1)) * w,
-        y: h - padY - ((v - min) / span) * (h - padY * 2),
+        y: h - padY - ((v - lo) / span) * (h - padY * 2),
       };
     });
 
@@ -567,13 +577,15 @@
   }
 
   var painted = false;
-  var usdChip = document.querySelector('.stat__chip');
+  var chips = Array.prototype.slice.call(document.querySelectorAll('[data-chip-for]'));
 
   function paint(stats) {
     painted = true;
     METRICS.forEach(function (key) { setValue(key, stats[key]); });
-    // The "… USD" chip has nothing to say without a USD figure.
-    if (usdChip) usdChip.hidden = typeof stats.distributedUsd !== 'number';
+    // Each chip hides itself when the figure it exists to show is missing.
+    chips.forEach(function (chip) {
+      chip.hidden = typeof stats[chip.dataset.chipFor] !== 'number';
+    });
   }
 
   /* ---------------------------------------------------------------------

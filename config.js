@@ -8,7 +8,7 @@ window.STONKEX_CONFIG = {
   /* Build stamp. Shown in the ?debug=1 panel, so you can confirm which version
      a browser actually has rather than guessing at a cache. Bump it together
      with the ?v= on the script tags in index.html whenever you deploy. */
-  version: '2026-08-29.10',
+  version: '2026-08-29.11',
 
   /* ---- Token ---------------------------------------------------------- */
 

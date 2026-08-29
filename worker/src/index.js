@@ -12,6 +12,7 @@ import {
   STREAMS, START_BLOCK, CHUNK_SIZE, MAX_CHUNKS_PER_RUN, CONFIRMATIONS,
   DEXSCREENER_KEX_TOKEN, TOKENS, CONTRACTS, EXCLUDE_FROM_HOLDERS, holderPayout,
 } from './config.js';
+import { tokenPriceUsd } from './price.js';
 
 const STATE_KEY = 'state:v1';
 const BALANCES_KEY = 'balances:v1';
@@ -84,24 +85,9 @@ function totalsToStrings(totals) {
   return out;
 }
 
-/** Current $STONKEX price in USD, or null. Never fatal — totals matter more. */
-async function kexPriceUsd(fetchImpl) {
-  const f = fetchImpl || fetch;
-  for (const url of [DEXSCREENER_KEX_TOKEN]) {
-    try {
-      const res = await f(url, { headers: { accept: 'application/json' } });
-      if (!res.ok) continue;
-      const d = await res.json();
-      const pairs = (d && d.pairs) || [];
-      const best = pairs
-        .filter((p) => p.chainId === 'base' &&
-          String(p.baseToken?.address || '').toLowerCase() === TOKENS.KEX.toLowerCase())
-        .sort((a, b) => (b.liquidity?.usd || 0) - (a.liquidity?.usd || 0))[0];
-      const price = parseFloat(best?.priceUsd);
-      if (isFinite(price) && price > 0) return price;
-    } catch (e) { /* keep going */ }
-  }
-  return null;
+/** $STONKEX price in USD, or null. Never fatal — the totals matter more. */
+function kexPriceUsd(fetchImpl) {
+  return tokenPriceUsd(DEXSCREENER_KEX_TOKEN, TOKENS.KEX, fetchImpl);
 }
 
 async function sync(env, ctx) {
@@ -146,22 +132,23 @@ async function sync(env, ctx) {
 }
 
 /** Shape the site expects. Unknown values stay null so tiles show a dash. */
-function present(state, price) {
+function present(state, kex) {
   const totals = totalsToBigInt(state.totals);
   const byId = {};
   SUM_STREAMS.forEach((s) => { byId[s.id] = toNumber(totals[s.id], s.decimals); });
 
   const feesIn = byId.feesIn ?? 0;
+  const feesUsd = kex != null ? feesIn * kex : null;
   // Strip the protocol's cut off the outflow, so "distributed" is what holders
   // actually received rather than everything that left the contract.
   const distributed = holderPayout(byId);
 
   return {
     totalDistributed: distributed,
-    totalDistributedUsd: price != null ? distributed * price : null,
+    totalDistributedUsd: kex != null ? distributed * kex : null,
     // Cumulative fees valued at the CURRENT price, not the price at the time of
     // each transfer. Good enough for a headline figure; say so if it matters.
-    totalFeesCollected: price != null ? feesIn * price : null,
+    totalFeesCollected: feesUsd,
 
     // Counted from transfers, so no explorer is involved. Only trustworthy once
     // the backfill has finished — a partial scan under-counts.
@@ -171,7 +158,7 @@ function present(state, price) {
     meta: {
       synced: !!state.complete,
       blocksBehind: state.head && state.cursor ? Math.max(0, state.head - state.cursor + 1) : null,
-      kexPriceUsd: price,
+      kexPriceUsd: kex,
     },
   };
 }

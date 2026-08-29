@@ -208,10 +208,15 @@ behaviour, not a bug: nothing invented is shown as real.
 
 Trend lines are drawn from real observations only:
 
-1. a `history` object on the rewards response, if it sends one —
-   `{ "marketCap": [ … ], "holders": [ … ] }`, oldest to newest; or
+1. the `history` block the indexer publishes — one observation per run, so
+   every visitor sees the same series and it survives a page reload; or
 2. a rolling series the browser records as the page refreshes, kept in
-   `localStorage` (`historyPoints` observations per metric, default 24).
+   `localStorage`, used only for metrics the indexer hasn't published.
+
+Sparklines scale against the level, not just the range. Normalising to min/max
+alone turns a 0.1% wobble into a full-height cliff — which is how a barely-moving
+total ends up looking like a crash. A series has to move about 4% of its own
+magnitude to fill the tile.
 
 A tile with fewer than three real points draws no line, so a first-time visitor
 sees the numbers before the trends. Set `useSample: true` to draw the placeholder
