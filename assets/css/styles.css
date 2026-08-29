@@ -216,7 +216,14 @@ a { color: inherit; text-decoration: none; }
   overflow: hidden;
 }
 
-.hero__img { width: 100%; }
+.hero__media {
+  display: block;
+  width: 100%;
+  height: auto;          /* beats the element's height attribute */
+  aspect-ratio: 2 / 1;   /* the clip and the still banner share this ratio */
+  object-fit: cover;
+  background: var(--surface);
+}
 
 
 /* ==========================================================================
@@ -494,7 +501,7 @@ a { color: inherit; text-decoration: none; }
      margins, so it reads as large as it can without losing content. */
   .hero { border-radius: 0; }
 
-  .hero__img {
+  .hero__media {
     width: 106%;        /* eats the banner's own margins, not its content */
     max-width: none;
     margin-left: -3%;

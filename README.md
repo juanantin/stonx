@@ -17,7 +17,10 @@ images/               branding
 
 - **Link bar** — the bull mark, X, chart, and a contract-address button that copies
   the CA to the clipboard and flashes a `COPIED!` confirmation.
-- **Hero** — the STONKEX Strategy banner (WebP with a PNG fallback).
+- **Hero** — the animated STONKEX Strategy banner, looping silently. The poster is
+  the clip's own first frame, so poster → playback is seamless. Viewers with
+  `prefers-reduced-motion: reduce` get the poster as a still and the video never
+  downloads.
 - **Dashboard** — six live tiles: total fees collected, total `$STONKEX` distributed
   (tokens plus its USD value), total holders, market cap, liquidity and 24h volume,
   each with a trend sparkline. Values blink a `…` placeholder until the first load
@@ -92,6 +95,12 @@ the page falls back to `execCommand` elsewhere.)
   the blue `.EXCHANGE` are untouched. Swap in an official light-background lockup
   if Stonks.Exchange publishes one.
 - `images/logo.png`, `favicon.png` and `apple-touch-icon.png` are all generated from
-  `images/stonx_logo.jpg`. Regenerate them together if the mark changes.
+  `images/stkstr_icon.png`. Regenerate them together if the mark changes
+  (apple-touch-icon is flattened onto white — iOS renders transparency as black).
+- `images/stonkex_header.mp4` is the source clip stripped of its audio track and
+  re-encoded (2.2MB → 627KB). It is **768×384**, so it is upscaled roughly 2.5× on a
+  desktop retina screen and looks soft there — re-export at 1536×768 or larger and
+  drop it in if you want it crisp. `images/stonkex_header.png` is kept only as the
+  Open Graph share image.
 - On mobile the hero runs edge to edge, the dashboard drops to two tiles per row, and
   the ecosystem blocks centre. Tested at 390px wide with no horizontal overflow.

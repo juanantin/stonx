@@ -75,15 +75,29 @@
 
   <!-- ===================== HERO ===================== -->
   <section class="hero" aria-label="STONKEX Strategy — buy $STONKEXSTR, get $STONKEX. 1B total supply on Base chain.">
-    <picture>
-      <source srcset="images/stonkex_header.webp" type="image/webp">
-      <img
-        class="hero__img"
-        src="images/stonkex_header.png"
-        alt="STONKEX Strategy — Stonk Exchange Strategy. Buy $STONKEXSTR, get $STONKEX. 1B total supply, on Base chain."
-        width="1774" height="887"
-        fetchpriority="high" decoding="async">
-    </picture>
+    <!-- The poster is the clip's own first frame, so poster → playback is
+         seamless. The source is attached by the script below only when the
+         viewer hasn't asked for reduced motion — otherwise nothing downloads
+         and the poster stands in as a still header. -->
+    <video
+      class="hero__media" id="hero-video"
+      poster="images/stonkex_header_poster.webp"
+      width="768" height="384"
+      autoplay muted loop playsinline preload="none"
+      aria-label="STONKEX Strategy — Stonk Exchange Strategy. Buy $STONKEXSTR, get $STONKEX. 1B total supply, on Base chain."
+      data-src="images/stonkex_header.mp4"></video>
+
+    <script>
+      (function () {
+        var v = document.getElementById('hero-video');
+        var still = !window.matchMedia || window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (still) return;
+        v.src = v.dataset.src;
+        v.preload = 'auto';
+        v.load();
+      })();
+    </script>
+
   </section>
 
   <!-- ===================== DASHBOARD ===================== -->
