@@ -27,6 +27,7 @@ window.STONKEX_CONFIG = {
                     token, i.e. the distributor           (/api/fee-routing) */
   contracts: {
     pool: '0x550b95fcb0e309c552FAe9670b1A514D443CA463',
+    rewardPool: '0x7692AcC1CDd771D09EbCae3663e1843b2911BEC7',  // STONKEX/WETH
     feeLocker: '0x71D1D363176723f85d98B8B430DF33cde89f0A7f',
     rewardsIndex: '0xf01a4dabfd54d1A6a1812a95F7151e8DA851DE2E',
   },

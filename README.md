@@ -58,15 +58,23 @@ earlier token also carries that name, so match on the address, not the symbol.
 
 ### Market data — DexScreener
 
-`GET https://api.dexscreener.com/latest/dex/tokens/<contract>`. Public, no key,
-CORS-enabled. Of the pairs it returns, the deepest-liquidity one on `chain` is
-used; `marketCap` is preferred over `fdv`.
+The known pool is queried first — `GET /latest/dex/pairs/base/<pool>` — falling
+back to the token search, `GET /latest/dex/tokens/<contract>`. Public, no key,
+CORS-enabled.
+
+Pool-first matters here: `$STONKEXSTR` trades against `$STONKEX` rather than a
+usual quote, and the token search can come back empty for a pair like that while
+the pool itself resolves fine. Of any list of pairs, the deepest-liquidity one on
+`chain` wins; `marketCap` is preferred over `fdv`. Pool addresses live in
+`contracts`, or override with `sources.dexscreener.pairAddress`.
 
 ### Holders — Blockscout
 
 DexScreener does not report holder counts, so they come from
 `https://base.blockscout.com/api/v2/tokens/<contract>` (free, no key). Blockscout
-has shipped the field as both `holders` and `holders_count`; both are read.
+has shipped the field as both `holders` and `holders_count`, and on a recently
+indexed token it sometimes only appears on `…/<contract>/counters` as
+`token_holders_count` — all three are tried in that order.
 
 Set `sources.holders.mode` to `'etherscan'` to use the Etherscan V2 multichain API
 instead — note its `tokenholdercount` action requires a paid Etherscan plan, and
@@ -108,8 +116,25 @@ the live DexScreener price of `rewardTokenAddress`.
 
 ### Debugging
 
-Append `?debug=1` to the URL. Every source logs its raw response and the merged
-result to the console, so you can see exactly which one supplied each number.
+Append `?debug=1` to the URL. A panel under the dashboard lists every source and
+what it returned, and the same detail goes to the console:
+
+```
+✓ ok     dexscreener:pair:0x550b95fc…
+· empty  holders:blockscout
+✓ ok     holders:blockscout:counters
+```
+
+Reading it:
+
+- **`Failed to fetch`** — CORS, a blocked host, or the page opened over `file://`.
+  Serve it over `http://` (see Running it) rather than double-clicking the file.
+- **`HTTP 404`** — wrong address or route.
+- **`ok, empty`** — the request worked but that source has nothing for this
+  token; the next fallback takes over.
+
+If a tile shows `—`, no source produced a number for it. That is the intended
+behaviour, not a bug: nothing invented is shown as real.
 
 `refreshSeconds` controls the poll interval (default 60).
 

@@ -284,10 +284,23 @@
      Each returns a partial stats object (or {}), and never rejects.
      --------------------------------------------------------------------- */
 
+  /* Every source's outcome for the current load, so ?debug=1 can show which
+     one came back empty rather than leaving you to guess at a row of dashes. */
+  var sourceLog = [];
+
   function softly(name, promise) {
     return promise.then(
-      function (v) { log(name, 'ok', v); return v; },
-      function (e) { log(name, 'failed', e && e.message); return null; }
+      function (v) {
+        log(name, 'ok', v);
+        sourceLog.push({ name: name, ok: true, empty: v === null || v === undefined, value: v });
+        return v;
+      },
+      function (e) {
+        var msg = (e && e.message) || 'failed';
+        log(name, 'failed', msg);
+        sourceLog.push({ name: name, ok: false, error: msg });
+        return null;
+      }
     );
   }
 
@@ -300,17 +313,38 @@
       })[0] || null;
   }
 
-  function dexPair(addr) {
+  var DEX = 'https://api.dexscreener.com/latest/dex/';
+
+  /* Look a pair up by its own address. More dependable than the token search
+     when a token trades against something other than the usual quotes — the
+     search can come back empty while the pool is right there. */
+  function dexByPair(pairAddress) {
+    if (!pairAddress) return Promise.resolve(null);
+    return softly('dexscreener:pair:' + pairAddress,
+      fetchJson(DEX + 'pairs/' + encodeURIComponent(CFG.chain || 'base') + '/' + encodeURIComponent(pairAddress))
+        .then(function (d) { return (d && d.pair) || bestPair(d && d.pairs, CFG.chain); }));
+  }
+
+  function dexByToken(addr) {
+    if (!addr) return Promise.resolve(null);
+    return softly('dexscreener:token:' + addr,
+      fetchJson(DEX + 'tokens/' + encodeURIComponent(addr))
+        .then(function (d) { return bestPair(d && d.pairs, CFG.chain); }));
+  }
+
+  /* Known pool first, token search as the fallback. */
+  function dexPair(addr, pairAddress) {
     var cfg = SRC.dexscreener || {};
-    if (cfg.enabled === false || !addr) return Promise.resolve(null);
-    return softly('dexscreener:' + addr,
-      fetchJson('https://api.dexscreener.com/latest/dex/tokens/' + encodeURIComponent(addr))
-        .then(function (data) { return bestPair(data && data.pairs, CFG.chain); }));
+    if (cfg.enabled === false) return Promise.resolve(null);
+    return dexByPair(pairAddress).then(function (pair) {
+      return pair || dexByToken(addr);
+    });
   }
 
   /* Market cap, liquidity, 24h volume. */
   function sourceDexScreener() {
-    return dexPair(address).then(function (pair) {
+    var pool = (SRC.dexscreener || {}).pairAddress || (CFG.contracts || {}).pool;
+    return dexPair(address, pool).then(function (pair) {
       if (!pair) return null;
       var out = {};
       var mc = num(pair.marketCap);
@@ -340,12 +374,20 @@
     }
 
     var base = (cfg.blockscoutBase || 'https://base.blockscout.com').replace(/\/+$/, '');
-    return softly('holders:blockscout',
-      fetchJson(base + '/api/v2/tokens/' + encodeURIComponent(address)).then(function (d) {
-        // Blockscout has used both spellings across versions.
-        var n = firstNumber(d, ['holders_count', 'holders']);
-        return n === null ? null : { holders: n };
-      }));
+    var token = base + '/api/v2/tokens/' + encodeURIComponent(address);
+
+    // Blockscout has used both spellings across versions, and on a freshly
+    // indexed token the figure sometimes only appears on the counters route.
+    return softly('holders:blockscout', fetchJson(token).then(function (d) {
+      return firstNumber(d, ['holders_count', 'holders']);
+    })).then(function (n) {
+      if (n !== null && n !== undefined) return { holders: n };
+      return softly('holders:blockscout:counters', fetchJson(token + '/counters').then(function (d) {
+        return firstNumber(d, ['token_holders_count', 'holders_count', 'holders']);
+      })).then(function (m) {
+        return (m === null || m === undefined) ? null : { holders: m };
+      });
+    });
   }
 
   /* Project rewards API — fees collected, $STONKEX distributed.
@@ -413,7 +455,7 @@
   /* Price the reward token, to turn distributed tokens into USD. */
   function sourceRewardPrice() {
     if (!CFG.rewardTokenAddress) return Promise.resolve(null);
-    return dexPair(CFG.rewardTokenAddress).then(function (pair) {
+    return dexPair(CFG.rewardTokenAddress, (CFG.contracts || {}).rewardPool).then(function (pair) {
       var price = pair ? num(pair.priceUsd) : null;
       return price === null ? null : { _rewardPrice: price };
     });
@@ -493,7 +535,29 @@
     };
   }
 
+  /* ?debug=1 — one line per source, so an empty tile is traceable to the
+     request that produced it. "Failed to fetch" almost always means CORS or a
+     blocked host; "HTTP 404" means the address or route is wrong; "ok, empty"
+     means the request succeeded but the source has nothing for this token. */
+  function renderDebug() {
+    if (!DEBUG || !note) return;
+    var box = document.getElementById('dash-debug');
+    if (!box) {
+      box = document.createElement('pre');
+      box.id = 'dash-debug';
+      box.style.cssText = 'margin:14px auto 0;max-width:640px;padding:12px 14px;border:1px solid #e6ebf3;' +
+        'border-radius:12px;background:#fbfcfe;color:#3d4655;font:12px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace;' +
+        'text-align:left;white-space:pre-wrap;word-break:break-word;';
+      note.parentNode.insertBefore(box, note.nextSibling);
+    }
+    box.textContent = sourceLog.map(function (s) {
+      return (s.ok ? (s.empty ? '· empty  ' : '✓ ok     ') : '✗ failed ') +
+        s.name + (s.ok ? '' : '  — ' + s.error);
+    }).join('\n') || 'no sources ran';
+  }
+
   function load() {
+    sourceLog = [];
     // Order matters: later sources override earlier ones.
     return Promise.all([
       sourceDexScreener(),
@@ -530,6 +594,7 @@
           ? 'Updated ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
           : 'Live data unavailable — retrying.';
       }
+      renderDebug();
     });
   }
 
