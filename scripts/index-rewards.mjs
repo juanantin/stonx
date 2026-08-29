@@ -86,24 +86,6 @@ async function pairStats() {
   } catch { return {}; }
 }
 
-/* One observation per run, oldest first, so the sparklines plot something that
-   actually happened rather than whatever a single browser saw in the last few
-   minutes. At a 15-minute cadence HISTORY_POINTS covers about half a day. */
-const HISTORY_POINTS = Number(process.env.HISTORY_POINTS || 48);
-const HISTORY_METRICS = ['fees', 'distributed', 'holders', 'marketCap', 'liquidity', 'volume24h'];
-
-function appendHistory(prev, sample) {
-  const hist = {};
-  for (const k of HISTORY_METRICS) {
-    const series = Array.isArray(prev && prev[k]) ? prev[k].slice() : [];
-    const v = sample[k];
-    // Only record real observations; a gap is better than a fabricated point.
-    if (typeof v === 'number' && isFinite(v)) series.push(Number(v.toFixed(6)));
-    if (series.length) hist[k] = series.slice(-HISTORY_POINTS);
-  }
-  return hist;
-}
-
 async function main() {
   const started = Date.now();
   const rpc = retrying(makeRpc(RPC_URL));
@@ -163,16 +145,6 @@ async function main() {
   const holders = holderCount(balances);
 
   const prev = readJson(OUT_FILE, {});
-  const history = complete
-    ? appendHistory(prev.history, {
-        fees: kex != null ? feesIn * kex : null,
-        distributed,
-        holders,
-        marketCap: market.marketCap,
-        liquidity: market.liquidity,
-        volume24h: market.volume24h,
-      })
-    : (prev.history || {});
 
   fs.writeFileSync(STATE_FILE, JSON.stringify({
     cursor, head, complete, passes,
@@ -187,20 +159,22 @@ async function main() {
     totalDistributed: complete ? distributed : null,
     totalDistributedUsd: complete && kex != null ? distributed * kex : null,
     totalFeesCollected: complete && kex != null ? feesIn * kex : null,
+    // The same fees in $STONKEX, so the tile can show the token amount next to
+    // the dollar figure without depending on the price lookup succeeding.
+    totalFeesTokens: complete ? feesIn : null,
     holders: complete ? holders : null,
     marketCap: market.marketCap ?? null,
     liquidity: market.liquidity ?? null,
     volume24h: market.volume24h ?? null,
-    history,
     updatedAt: new Date().toISOString(),
     meta: {
       synced: complete, blocksBehind: Math.max(0, head - cursor + 1),
-      kexPriceUsd: kex, historyPoints: Object.values(history)[0]?.length ?? 0,
+      kexPriceUsd: kex,
     },
   }, null, 2) + '\n');
 
   console.log(complete
-    ? `synced · fees ${feesIn.toFixed(2)} KEX · to holders ${distributed.toFixed(2)} KEX · holders ${holders} · history ${Object.values(history)[0]?.length ?? 0} pts`
+    ? `synced · fees ${feesIn.toFixed(2)} KEX · to holders ${distributed.toFixed(2)} KEX · holders ${holders}`
     : `partial · ${head - cursor + 1} blocks behind · continues next run`);
 
   // Advancing the cursor at all is progress worth committing, so only fail the

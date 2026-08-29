@@ -1,6 +1,6 @@
 /* ==========================================================================
    STONKEX STRATEGY — app
-   Contract-address copy, live dashboard, sparklines.
+   Contract-address copy, live dashboard.
 
    Data flow: each source in CONFIG.sources returns the fields it knows about;
    they are merged in order, so a later source overrides an earlier one. Add
@@ -15,7 +15,7 @@
   var SRC = CFG.sources || {};
   var DEBUG = /[?&]debug=1\b/.test(location.search);
 
-  var METRICS = ['fees', 'distributed', 'distributedUsd', 'holders',
+  var METRICS = ['fees', 'feesTokens', 'distributed', 'distributedUsd', 'holders',
                  'marketCap', 'liquidity', 'volume24h'];
 
   function log() {
@@ -35,6 +35,7 @@
 
   var FORMATTERS = {
     fees: usd,
+    feesTokens: amount,
     distributed: amount,
     distributedUsd: amount,
     holders: count,
@@ -149,154 +150,6 @@
       } else {
         fallback();
       }
-    });
-  }
-
-  /* ---------------------------------------------------------------------
-     Sparklines
-     Single series per tile, so no legend: the tile label names the metric.
-     2px line, round caps, ~10% area wash, one end-marker with a surface ring.
-     --------------------------------------------------------------------- */
-
-  var SPARK_COLORS = { blue: '#1f55f0', green: '#2eb135' };
-
-  /* Cardinal spline through the points, so the trend reads as a curve
-     rather than a zig-zag. */
-  function splinePath(pts, tension) {
-    if (pts.length < 2) return '';
-    var t = tension == null ? 0.5 : tension;
-    var d = 'M' + pts[0].x.toFixed(2) + ',' + pts[0].y.toFixed(2);
-
-    for (var i = 0; i < pts.length - 1; i++) {
-      var p0 = pts[i - 1] || pts[i];
-      var p1 = pts[i];
-      var p2 = pts[i + 1];
-      var p3 = pts[i + 2] || p2;
-
-      var c1x = p1.x + ((p2.x - p0.x) / 6) * t;
-      var c1y = p1.y + ((p2.y - p0.y) / 6) * t;
-      var c2x = p2.x - ((p3.x - p1.x) / 6) * t;
-      var c2y = p2.y - ((p3.y - p1.y) / 6) * t;
-
-      d += 'C' + c1x.toFixed(2) + ',' + c1y.toFixed(2) +
-           ' ' + c2x.toFixed(2) + ',' + c2y.toFixed(2) +
-           ' ' + p2.x.toFixed(2) + ',' + p2.y.toFixed(2);
-    }
-    return d;
-  }
-
-  var sparkSeq = 0;
-
-  function drawSpark(host, series, colorKey) {
-    var tile = host.closest ? host.closest('.stat') : null;
-
-    // Fewer than three real observations isn't a trend — draw nothing, and
-    // collapse the space so the tile doesn't sit half empty waiting for one.
-    if (!series || series.length < 3) {
-      host.innerHTML = '';
-      if (tile) tile.classList.add('stat--flat');
-      return;
-    }
-    if (tile) tile.classList.remove('stat--flat');
-
-    var cs = getComputedStyle(host);
-    var w = host.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
-    var h = host.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
-    if (!(w > 0) || !(h > 0)) return;
-
-    var color = SPARK_COLORS[colorKey] || SPARK_COLORS.blue;
-    var padY = 10;
-    var min = Math.min.apply(null, series);
-    var max = Math.max.apply(null, series);
-
-    /* Scale against the level, not just the range. Normalising to min/max alone
-       turns a 0.1% wobble into a full-height cliff, which is how a barely-moving
-       total ends up looking like a crash. A series has to move ~4% of its own
-       magnitude to fill the tile; anything smaller reads as the near-flat line
-       it actually is. */
-    var mean = series.reduce(function (a, b) { return a + b; }, 0) / series.length;
-    var span = Math.max(max - min, Math.abs(mean) * 0.04, 1e-9);
-    var mid = (max + min) / 2;
-    var lo = mid - span / 2;
-
-    var pts = series.map(function (v, i) {
-      return {
-        x: (i / (series.length - 1)) * w,
-        y: h - padY - ((v - lo) / span) * (h - padY * 2),
-      };
-    });
-
-    var line = splinePath(pts, 0.5);
-    var area = line + 'L' + w.toFixed(2) + ',' + h + 'L0,' + h + 'Z';
-    var last = pts[pts.length - 1];
-    var gid = 'spark-grad-' + (++sparkSeq);
-
-    host.innerHTML =
-      '<svg viewBox="0 0 ' + w + ' ' + h + '" width="' + w + '" height="' + h + '" aria-hidden="true" focusable="false">' +
-        '<defs><linearGradient id="' + gid + '" x1="0" y1="0" x2="0" y2="1">' +
-          '<stop offset="0%" stop-color="' + color + '" stop-opacity="0.16"/>' +
-          '<stop offset="100%" stop-color="' + color + '" stop-opacity="0"/>' +
-        '</linearGradient></defs>' +
-        '<path d="' + area + '" fill="url(#' + gid + ')"/>' +
-        '<path d="' + line + '" fill="none" stroke="' + color + '" stroke-width="2" ' +
-              'stroke-linecap="round" stroke-linejoin="round"/>' +
-        '<circle cx="' + (last.x - 3).toFixed(2) + '" cy="' + last.y.toFixed(2) + '" r="4" ' +
-              'fill="' + color + '" stroke="#fbfcfe" stroke-width="2"/>' +
-      '</svg>';
-  }
-
-  var sparkHosts = Array.prototype.slice.call(document.querySelectorAll('[data-spark]'));
-  var sparkData = CFG.useSample ? Object.assign({}, CFG.sampleHistory || {}) : {};
-
-  function renderSparks() {
-    sparkHosts.forEach(function (host) {
-      drawSpark(host, sparkData[host.dataset.spark], host.dataset.color);
-    });
-  }
-
-  if (typeof ResizeObserver === 'function' && sparkHosts.length) {
-    var ro = new ResizeObserver(function () { renderSparks(); });
-    sparkHosts.forEach(function (host) { ro.observe(host); });
-  } else {
-    window.addEventListener('resize', renderSparks);
-  }
-
-  /* ---------------------------------------------------------------------
-     Rolling history
-     Real observations this browser has seen, so the trend lines mean
-     something even when the API sends no history of its own.
-     --------------------------------------------------------------------- */
-
-  var STORE_KEY = 'stonkex:history:v1';
-  var MIN_GAP_MS = 45000;
-
-  function readStore() {
-    try { return JSON.parse(localStorage.getItem(STORE_KEY)) || {}; }
-    catch (e) { return {}; }
-  }
-
-  function recordHistory(stats) {
-    var cap = Number(CFG.historyPoints) || 24;
-    var now = Date.now();
-    var store = readStore();
-
-    METRICS.forEach(function (key) {
-      var v = stats[key];
-      if (typeof v !== 'number' || !isFinite(v)) return;
-
-      var series = Array.isArray(store[key]) ? store[key] : [];
-      var last = series[series.length - 1];
-      if (last && now - last[0] < MIN_GAP_MS) series.pop();   // replace, don't stack
-      series.push([now, v]);
-      store[key] = series.slice(-cap);
-    });
-
-    try { localStorage.setItem(STORE_KEY, JSON.stringify(store)); } catch (e) { /* private mode */ }
-
-    // API-supplied history wins; otherwise use what we've recorded.
-    METRICS.forEach(function (key) {
-      if (sparkData[key] && sparkData[key].fromApi) return;
-      if (Array.isArray(store[key])) sparkData[key] = store[key].map(function (p) { return p[1]; });
     });
   }
 
@@ -490,6 +343,7 @@
 
     var map = {
       totalFeesCollected: 'fees',
+      totalFeesTokens: 'feesTokens',
       totalDistributed: 'distributed',
       totalDistributedUsd: 'distributedUsd',
       holders: 'holders',
@@ -502,19 +356,6 @@
       var n = firstNumber(d, fields[from]);
       if (n !== null) out[map[from]] = n;
     });
-
-    // Optional history, oldest → newest.
-    var hist = pick(d, 'history') || pick(d, 'data.history');
-    if (hist && typeof hist === 'object') {
-      Object.keys(hist).forEach(function (k) {
-        var series = hist[k];
-        if (!Array.isArray(series) || series.length < 3) return;
-        var vals = series.map(function (p) {
-          return Array.isArray(p) ? num(p[1]) : (p && typeof p === 'object' ? num(p.value) : num(p));
-        }).filter(function (v) { return v !== null; });
-        if (vals.length >= 3) { vals.fromApi = true; sparkData[k] = vals; }
-      });
-    }
 
     if (out.distributedUsd === undefined) {
       log('rewards', 'no USD figure for distributed — deriving from rewardTokenAddress price');
@@ -661,8 +502,6 @@
 
       log('merged', stats);
       paint(stats);
-      recordHistory(stats);
-      renderSparks();
 
       if (note) {
         note.textContent = live
@@ -678,10 +517,6 @@
      Tiles blink a "…" placeholder until the first load resolves. If the
      network is slow or dead, fall back rather than blinking forever.
      --------------------------------------------------------------------- */
-
-  // Seed the sparklines from anything this browser already recorded.
-  recordHistory({});
-  renderSparks();
 
   var fallbackTimer = setTimeout(function () {
     if (!painted) paint(baseStats());

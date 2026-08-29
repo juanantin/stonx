@@ -21,10 +21,10 @@ images/               branding
   the clip's own first frame, so poster → playback is seamless. Viewers with
   `prefers-reduced-motion: reduce` get the poster as a still and the video never
   downloads.
-- **Dashboard** — six live tiles: total fees collected, total `$STONKEX` distributed
-  (tokens plus its USD value), total holders, market cap, liquidity and 24h volume,
-  each with a trend sparkline. Values blink a `…` placeholder until the first load
-  resolves.
+- **Dashboard** — six live tiles: total `$STONKEX` distributed (tokens plus its
+  USD value), total fees collected (USD plus the same figure in `$STONKEX`),
+  total holders, market cap, liquidity and 24h volume. Values blink a `…`
+  placeholder until the first load resolves.
 - **Ecosystem** — the [The Stonks Exchange](https://www.thestonks.exchange/) and
   [Stockify](https://www.stockify.finance/) lockups, each one the link itself.
 
@@ -203,25 +203,6 @@ If a tile shows `—`, no source produced a number for it. That is the intended
 behaviour, not a bug: nothing invented is shown as real.
 
 `refreshSeconds` controls the poll interval (default 60).
-
-## Sparklines
-
-Trend lines are drawn from real observations only:
-
-1. the `history` block the indexer publishes — one observation per run, so
-   every visitor sees the same series and it survives a page reload; or
-2. a rolling series the browser records as the page refreshes, kept in
-   `localStorage`, used only for metrics the indexer hasn't published.
-
-Sparklines scale against the level, not just the range. Normalising to min/max
-alone turns a 0.1% wobble into a full-height cliff — which is how a barely-moving
-total ends up looking like a crash. A series has to move about 4% of its own
-magnitude to fill the tile.
-
-A tile with fewer than three real points draws no line, so a first-time visitor
-sees the numbers before the trends. Set `useSample: true` to draw the placeholder
-shapes in `sampleHistory` instead — they are decorative, not data, so use that
-only for screenshots.
 
 ## Deploying
 

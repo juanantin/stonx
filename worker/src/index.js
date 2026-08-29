@@ -149,6 +149,8 @@ function present(state, kex) {
     // Cumulative fees valued at the CURRENT price, not the price at the time of
     // each transfer. Good enough for a headline figure; say so if it matters.
     totalFeesCollected: feesUsd,
+    // Same fees expressed in $STONKEX, for the token chip beside the dollars.
+    totalFeesTokens: feesIn,
 
     // Counted from transfers, so no explorer is involved. Only trustworthy once
     // the backfill has finished — a partial scan under-counts.

@@ -8,7 +8,7 @@ window.STONKEX_CONFIG = {
   /* Build stamp. Shown in the ?debug=1 panel, so you can confirm which version
      a browser actually has rather than guessing at a cache. Bump it together
      with the ?v= on the script tags in index.html whenever you deploy. */
-  version: '2026-08-29.11',
+  version: '2026-08-29.12',
 
   /* ---- Token ---------------------------------------------------------- */
 
@@ -143,6 +143,7 @@ window.STONKEX_CONFIG = {
           'totalFeesCollected', 'totalFeesUsd', 'feesCollectedUsd', 'fees.totalUsd',
           'data.totalFeesCollected', 'stats.totalFeesCollected',
         ],
+        totalFeesTokens: ['totalFeesTokens', 'feesTokens', 'data.totalFeesTokens'],
         totalDistributed: [
           'totalDistributed', 'totalRewardsDistributed', 'rewardsDistributed',
           'data.totalDistributed', 'stats.totalDistributed',
@@ -170,6 +171,7 @@ window.STONKEX_CONFIG = {
 
   stats: {
     totalFeesCollected: null,
+    totalFeesTokens: null,
     totalDistributed: null,
     totalDistributedUsd: null,
     holders: null,
@@ -178,27 +180,4 @@ window.STONKEX_CONFIG = {
     volume24h: null,
   },
 
-  /* ---- Sparklines ----------------------------------------------------- */
-  /* Trend lines are drawn from real observations only:
-
-       1. a `history` object on the rewards response, if it sends one —
-          { "marketCap": [ ... ], "holders": [ ... ] } — oldest to newest; or
-       2. a rolling series this browser records as the page refreshes, kept in
-          localStorage.
-
-     A tile with fewer than 3 real points draws no line. Turn `useSample` on to
-     draw the placeholder shapes below instead — they are decorative, not data,
-     so only use it for screenshots.                                          */
-
-  historyPoints: 24,   // how many observations to keep per metric
-  useSample: false,
-
-  sampleHistory: {
-    fees: [12, 15, 14, 19, 22, 20, 26, 31, 29, 36, 42, 48],
-    distributed: [10, 13, 17, 16, 21, 25, 24, 30, 34, 33, 41, 47],
-    holders: [8, 11, 10, 15, 18, 17, 23, 26, 30, 29, 38, 44],
-    marketCap: [14, 12, 18, 21, 19, 25, 29, 27, 34, 38, 41, 46],
-    liquidity: [9, 12, 11, 16, 20, 18, 24, 23, 29, 33, 37, 43],
-    volume24h: [16, 13, 20, 18, 24, 28, 26, 32, 30, 37, 40, 45],
-  },
 };
