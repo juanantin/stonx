@@ -76,7 +76,8 @@
   function fetchJson(url, headers) {
     var h = { accept: 'application/json' };
     if (headers) Object.keys(headers).forEach(function (k) { h[k] = headers[k]; });
-    return fetch(url, { headers: h }).then(function (r) {
+    // no-store: a polling dashboard must not be served a cached total
+    return fetch(url, { headers: h, cache: 'no-store' }).then(function (r) {
       if (!r.ok) throw new Error('HTTP ' + r.status);
       return r.json();
     });

@@ -91,39 +91,52 @@ the two key-free ones run first and the rest only engage once you add a key.
 
 Run with `?debug=1` to see which provider answered.
 
-### Rewards — still unsourced
+### Rewards — feeding fees and distribution
 
-Fees collected and `$STONKEX` distributed are project figures that no explorer
-knows, and they are the one thing still missing. Set `sources.rewards.url` to the
-JSON endpoint that carries them — one URL, or an array of them, each read through
-`sources.rewards.fields`.
+Fees collected and `$STONKEX` distributed are protocol figures. No explorer
+knows them, so they have to be fed in. Three ways, cheapest first.
 
-These thestonks.exchange endpoints have been checked and do **not** carry the
-totals:
+**1. Edit the committed file.** `sources.rewards.url` already points at
+`data/rewards.json`. Put numbers in it, push, done — same origin, no CORS, no
+infrastructure:
 
-| Endpoint | What it returns |
-|---|---|
-| `/api/kols/airdrops?token=<ca>` | KOL airdrops — empty for this token |
-| `/api/fee-routing?pairs=<ca>:<feeLocker>` | routing config only |
-| `/api/coins` | token metadata and supply |
+```json
+{ "totalFeesCollected": 1284.37, "totalDistributed": 8412906.5 }
+```
 
-`fee-routing` did establish that this token's fees route to `rewards` via index
-contract `0xf01a4dab…51DE2E`, and the token page also issues Alchemy JSON-RPC
-calls — so the figures it renders are probably read straight off that contract
-rather than served by an API. If that's the case they need either an endpoint
-that exposes them or an indexer; a browser cannot sum transfer logs across Base
-history.
+Leave `totalDistributedUsd` out and it is derived from the live `$STONKEX`
+price. Any field left `null` shows as an em dash, so the file is safe to publish
+half-filled. Fine for a launch; it is a manual number, so it goes stale between
+pushes.
 
-`sources.rewards.fields` maps our metric names onto the response using dot-paths
-(`data.stats.totalFeesUsd`, `rewards.0.amount`). Several common spellings are
-listed per metric and the first that resolves to a number wins, so usually you
-just add the response's own key to the front of a list.
+**2. Ask Stockify.** Stockify runs the rewards for this token — its own listing
+mentions "20k already distributed", so it tracks these numbers. If they expose an
+endpoint, that is the correct source and the least work:
 
-The endpoint must send permissive CORS headers, since the browser calls it
-directly. If it doesn't, proxy it from your own domain.
+```js
+url: ['https://<stockify-endpoint>', 'data/rewards.json'],
+```
 
-If it returns tokens but no USD figure for them, the USD value is derived from
-the live DexScreener price of `rewardTokenAddress`.
+The array is a fallback chain: the endpoint answers when it can, the file covers
+it when it doesn't. Add the response's own key names to the front of the matching
+list in `sources.rewards.fields` if they differ from the ones already there.
+
+**3. Index it yourself.** The figures live on-chain. `$STONKEXSTR` fees route to
+`rewards` through index contract `0xf01a4dab…51DE2E` (that is what
+`/api/fee-routing` reports), and the token launched at Base block **50530608** —
+so the range that needs scanning is bounded, not all of chain history.
+
+A small scheduled job — Cloudflare Worker, Vercel cron, anything — can walk
+`eth_getLogs` for `$STONKEX` Transfer events from that contract, keep a running
+total, and serve it as the JSON above. That is the only option that stays correct
+without anyone touching it.
+
+What it cannot be is browser-side: summing transfer logs across Base history on
+every page load is not something a visitor's browser can do. It needs a job that
+runs on a schedule and stores the total.
+
+Check the index contract on Basescan first — if it is verified and exposes a
+total as a view function, one `eth_call` replaces the whole log scan.
 
 ### Debugging
 

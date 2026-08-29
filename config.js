@@ -117,7 +117,12 @@ window.STONKEX_CONFIG = {
        it directly. If it doesn't, proxy it from your own domain.              */
     rewards: {
       enabled: true,
-      url: null,        // string, or an array of strings
+      // A string, or an array of them. Defaults to the committed JSON file, so
+      // the plumbing works with no infrastructure: edit data/rewards.json, push,
+      // done. Add a real endpoint in front of it when you have one —
+      //   url: ['https://api.example.com/stonkexstr', 'data/rewards.json'],
+      // and the first source with a number for a metric wins.
+      url: 'data/rewards.json',
 
       fields: {
         totalFeesCollected: [
