@@ -503,10 +503,11 @@
       log('merged', stats);
       paint(stats);
 
+      // Only worth saying something when the data ISN'T live — a timestamp on
+      // a working dashboard is noise.
       if (note) {
-        note.textContent = live
-          ? 'Updated ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-          : 'Live data unavailable — retrying.';
+        note.textContent = live ? '' : 'Live data unavailable — retrying.';
+        note.hidden = !!live;
       }
       renderDebug();
     });
