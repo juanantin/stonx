@@ -24,12 +24,14 @@
     "Once a real source exists (see README ▸ Rewards), point",
     "sources.rewards.url at that instead and this file can go."
   ],
-
-  "totalFeesCollected": null,
-  "totalDistributed": null,
-  "totalDistributedUsd": null,
-
-  "updatedAt": null,
-
-  "history": {}
+  "totalDistributed": 77671.73125011318,
+  "totalDistributedUsd": 124.19709826893097,
+  "totalFeesCollected": 5674.095602749,
+  "holders": 96,
+  "updatedAt": "2026-08-29T16:14:56.089Z",
+  "meta": {
+    "synced": true,
+    "blocksBehind": 0,
+    "kexPriceUsd": 0.001599
+  }
 }
