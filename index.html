@@ -14,7 +14,8 @@
 <meta name="twitter:site" content="@Stonks_Exchange">
 <meta name="theme-color" content="#f7f9fc">
 
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231f55f0'/%3E%3Cpath d='M13 7h6v6h6v6h-6v6h-6v-6H7v-6h6z' fill='%234ecb3a'/%3E%3C/svg%3E">
+<link rel="icon" type="image/png" sizes="64x64" href="images/favicon.png">
+<link rel="apple-touch-icon" href="images/apple-touch-icon.png">
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -27,6 +28,9 @@
 <!-- ===================== TOP LINK BAR ===================== -->
 <header class="topbar">
   <nav class="topbar__inner" aria-label="Primary">
+
+    <img class="topbar__logo" src="images/logo.png"
+         alt="STONKEX Strategy" width="256" height="256" fetchpriority="high">
 
     <a class="pill" id="link-x" href="https://x.com/Stonks_Exchange" target="_blank" rel="noopener noreferrer">
       <svg class="pill__icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -101,7 +105,7 @@
           </span>
           <h2 class="stat__label">Total fees collected</h2>
         </div>
-        <p class="stat__value" data-value="fees">—</p>
+        <p class="stat__value" data-value="fees"><span class="dots" role="img" aria-label="Loading"><i></i><i></i><i></i></span></p>
         <div class="stat__spark" data-spark="fees" data-color="blue" aria-hidden="true"></div>
       </article>
 
@@ -113,8 +117,8 @@
           </span>
           <h2 class="stat__label">Total $STONKEX distributed</h2>
         </div>
-        <p class="stat__value stat__value--green" data-value="distributed">—</p>
-        <p class="stat__chip"><b data-value="distributedUsd">—</b> <span>USD</span></p>
+        <p class="stat__value stat__value--green" data-value="distributed"><span class="dots" role="img" aria-label="Loading"><i></i><i></i><i></i></span></p>
+        <p class="stat__chip"><b data-value="distributedUsd"><span class="dots" role="img" aria-label="Loading"><i></i><i></i><i></i></span></b> <span>USD</span></p>
         <div class="stat__spark" data-spark="distributed" data-color="green" aria-hidden="true"></div>
       </article>
 
@@ -126,7 +130,7 @@
           </span>
           <h2 class="stat__label">Total holders</h2>
         </div>
-        <p class="stat__value" data-value="holders">—</p>
+        <p class="stat__value" data-value="holders"><span class="dots" role="img" aria-label="Loading"><i></i><i></i><i></i></span></p>
         <div class="stat__spark" data-spark="holders" data-color="blue" aria-hidden="true"></div>
       </article>
 
@@ -138,7 +142,7 @@
           </span>
           <h2 class="stat__label">Market cap</h2>
         </div>
-        <p class="stat__value" data-value="marketCap">—</p>
+        <p class="stat__value" data-value="marketCap"><span class="dots" role="img" aria-label="Loading"><i></i><i></i><i></i></span></p>
         <div class="stat__spark" data-spark="marketCap" data-color="green" aria-hidden="true"></div>
       </article>
 
@@ -150,7 +154,7 @@
           </span>
           <h2 class="stat__label">Liquidity</h2>
         </div>
-        <p class="stat__value" data-value="liquidity">—</p>
+        <p class="stat__value" data-value="liquidity"><span class="dots" role="img" aria-label="Loading"><i></i><i></i><i></i></span></p>
         <div class="stat__spark" data-spark="liquidity" data-color="blue" aria-hidden="true"></div>
       </article>
 
@@ -162,7 +166,7 @@
           </span>
           <h2 class="stat__label">24h volume</h2>
         </div>
-        <p class="stat__value" data-value="volume24h">—</p>
+        <p class="stat__value" data-value="volume24h"><span class="dots" role="img" aria-label="Loading"><i></i><i></i><i></i></span></p>
         <div class="stat__spark" data-spark="volume24h" data-color="green" aria-hidden="true"></div>
       </article>
 
@@ -178,12 +182,8 @@
       <img class="partner__art" src="images/launched.png" alt="" width="400" height="400" loading="lazy" decoding="async">
       <span class="partner__copy">
         <span class="partner__kicker">Launched in</span>
-        <span class="partner__brand">
+        <span class="partner__brand partner__brand--dark">
           <img src="images/stonkex_button.png" alt="Stonks.Exchange" width="550" height="112" loading="lazy" decoding="async">
-        </span>
-        <span class="partner__url">
-          www.thestonks.exchange
-          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M14 4h6v6M20 4l-8.4 8.4M18 14v4.6A1.4 1.4 0 0 1 16.6 20H5.4A1.4 1.4 0 0 1 4 18.6V7.4A1.4 1.4 0 0 1 5.4 6H10" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </span>
       </span>
     </a>
@@ -192,12 +192,8 @@
       <img class="partner__art" src="images/rewards.png" alt="" width="400" height="346" loading="lazy" decoding="async">
       <span class="partner__copy">
         <span class="partner__kicker">Holders rewards powered by</span>
-        <span class="partner__brand">
-          <img src="images/stockify_logo.png" alt="Stockify" width="700" height="228" loading="lazy" decoding="async">
-        </span>
-        <span class="partner__url">
-          www.stockify.finance
-          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M14 4h6v6M20 4l-8.4 8.4M18 14v4.6A1.4 1.4 0 0 1 16.6 20H5.4A1.4 1.4 0 0 1 4 18.6V7.4A1.4 1.4 0 0 1 5.4 6H10" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="partner__brand partner__brand--light">
+          <img src="images/stockify_logo.png" alt="Stockify" width="800" height="261" loading="lazy" decoding="async">
         </span>
       </span>
     </a>

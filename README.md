@@ -15,14 +15,15 @@ images/               branding
 
 ## What's on the page
 
-- **Link bar** — X, chart, and a contract-address button that copies the CA to the
-  clipboard and flashes a `COPIED!` confirmation.
+- **Link bar** — the bull mark, X, chart, and a contract-address button that copies
+  the CA to the clipboard and flashes a `COPIED!` confirmation.
 - **Hero** — the STONKEX Strategy banner (WebP with a PNG fallback).
 - **Dashboard** — six live tiles: total fees collected, total `$STONKEX` distributed
   (tokens plus its USD value), total holders, market cap, liquidity and 24h volume,
-  each with a trend sparkline.
-- **Ecosystem** — launched in [The Stonks Exchange](https://www.thestonks.exchange/),
-  holder rewards powered by [Stockify](https://www.stockify.finance/).
+  each with a trend sparkline. Values blink a `…` placeholder until the first load
+  resolves.
+- **Ecosystem** — the [The Stonks Exchange](https://www.thestonks.exchange/) and
+  [Stockify](https://www.stockify.finance/) lockups, each one the link itself.
 
 ## Setup
 
@@ -85,6 +86,9 @@ the page falls back to `execCommand` elsewhere.)
 ## Notes
 
 - Light theme only, by design — the brand artwork is built for a white ground.
-- Both partner lockups are light-on-transparent artwork, so they sit on a dark plate
-  to stay legible on the white card.
-- Tested down to 390px wide with no horizontal overflow.
+- Each partner lockup sits on the plate its artwork needs — dark for Stonks.Exchange
+  (light artwork), light for Stockify (dark artwork) — at a matched button size.
+- `images/logo.png`, `favicon.png` and `apple-touch-icon.png` are all generated from
+  `images/stonx_logo.jpg`. Regenerate them together if the mark changes.
+- On mobile the hero runs edge to edge, the dashboard drops to two tiles per row, and
+  the ecosystem blocks centre. Tested at 390px wide with no horizontal overflow.

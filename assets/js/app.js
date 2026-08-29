@@ -233,7 +233,10 @@
     })(start);
   }
 
+  var painted = false;
+
   function paint(stats) {
+    painted = true;
     ['fees', 'distributed', 'distributedUsd', 'holders', 'marketCap', 'liquidity', 'volume24h']
       .forEach(function (key) { setValue(key, stats[key]); });
   }
@@ -353,11 +356,20 @@
     });
   }
 
-  // Paint the configured values immediately so the page is never blank,
-  // then refresh from live sources.
-  paint(baseStats());
+  // The tiles blink a "…" placeholder until the first load resolves. If the
+  // network is slow or dead, fall back to the configured values rather than
+  // blinking forever.
   renderSparks();
-  load();
+
+  var fallbackTimer = setTimeout(function () {
+    if (!painted) paint(baseStats());
+  }, 4000);
+
+  load()['catch'](function () {})
+    .then(function () {
+      clearTimeout(fallbackTimer);
+      if (!painted) paint(baseStats());
+    });
 
   var every = Number(CFG.refreshSeconds) || 0;
   if (every > 0) setInterval(load, every * 1000);
