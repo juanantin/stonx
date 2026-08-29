@@ -16,6 +16,7 @@ import { fileURLToPath } from 'node:url';
 import { indexRange, makeRpc, toNumber, countHolders } from '../worker/src/indexer.js';
 import {
   STREAMS, START_BLOCK, CHUNK_SIZE, CONFIRMATIONS, EXCLUDE_FROM_HOLDERS, TOKENS,
+  holderPayout,
 } from '../worker/src/config.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -131,8 +132,12 @@ async function main() {
   const complete = cursor > head;
   const price = await kexPriceUsd();
 
-  const distributed = toNumber(totals.distributed ?? 0n, 18);
-  const feesIn = toNumber(totals.feesIn ?? 0n, 18);
+  // feesIn is what reached the rewards contract; holderPayout strips the
+  // protocol's cut off the outflow so "distributed" means paid to holders.
+  const asTokens = {};
+  SUM_STREAMS.forEach((st) => { asTokens[st.id] = toNumber(totals[st.id], st.decimals); });
+  const feesIn = asTokens.feesIn ?? 0;
+  const distributed = holderPayout(asTokens);
   const holders = holderCount(balances);
 
   fs.writeFileSync(STATE_FILE, JSON.stringify({
@@ -155,7 +160,7 @@ async function main() {
   }, null, 2) + '\n');
 
   console.log(complete
-    ? `synced · distributed ${distributed} · fees ${feesIn} KEX · holders ${holders} · price ${price}`
+    ? `synced · fees ${feesIn.toFixed(2)} KEX · to holders ${distributed.toFixed(2)} KEX · holders ${holders} · price ${price}`
     : `partial · ${head - cursor + 1} blocks behind · continues next run`);
 
   // Advancing the cursor at all is progress worth committing, so only fail the

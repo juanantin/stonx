@@ -38,9 +38,9 @@ function makeEnv(head, transfers) {
     }
     const f = body.params[0];
     const from = parseInt(f.fromBlock, 16), to = parseInt(f.toBlock, 16);
-    const isDistributed = f.topics.length === 2;      // from-filter
-    const key = isDistributed ? 'distributed' : 'feesIn';
-    const logs = (transfers[key] || [])
+    // topics: [T] = balances, [T, from] = paidOut, [T, null, to] = feesIn
+    const key = f.topics.length === 2 ? 'paidOut' : f.topics.length === 3 ? 'feesIn' : null;
+    const logs = (key ? transfers[key] || [] : [])
       .filter(([b]) => b >= from && b <= to)
       .map(([, amt]) => ({ data: word(amt) }));
     return { ok: true, json: async () => ({ result: logs }) };
@@ -68,24 +68,26 @@ const ctx = makeCtx();
 
 test('cron sync banks totals, then a later run resumes without re-counting', async () => {
   const mod = (await import('../src/index.js')).default;
+  const { HOLDER_SHARE } = await import('../src/config.js');
 
   // First run: head only a little past the start block.
   const a = makeEnv(START + 999, {
-    distributed: [[START + 10, 5n * E18], [START + 500, 3n * E18]],
+    paidOut: [[START + 10, 5n * E18], [START + 500, 3n * E18]],
     feesIn: [[START + 20, 12n * E18]],
   });
   await runCron(mod, a.env);
 
   let res = await mod.fetch(new Request('https://w/'), a.env, ctx);
   let body = await res.json();
-  assert.equal(body.totalDistributed, 8);
-  assert.equal(body.totalFeesCollected, 3);            // 12 KEX × $0.25
-  assert.equal(body.totalDistributedUsd, 2);           // 8 KEX × $0.25
+  // 8 KEX left the contract; only the holders' share counts as distributed.
+  assert.equal(body.totalDistributed, 8 * HOLDER_SHARE);
+  assert.equal(body.totalDistributedUsd, 8 * HOLDER_SHARE * 0.25);
+  assert.equal(body.totalFeesCollected, 3);            // 12 KEX in × $0.25
   assert.equal(body.meta.synced, true);
 
-  // Head advances; a new distribution lands. Reuse the same KV.
+  // Head advances; a new payout lands. Reuse the same KV.
   const b = makeEnv(START + 1999, {
-    distributed: [[START + 10, 5n * E18], [START + 500, 3n * E18], [START + 1500, 4n * E18]],
+    paidOut: [[START + 10, 5n * E18], [START + 500, 3n * E18], [START + 1500, 4n * E18]],
     feesIn: [[START + 20, 12n * E18]],
   });
   b.env.STONKEX = a.KV;                                 // carry state over
@@ -94,20 +96,35 @@ test('cron sync banks totals, then a later run resumes without re-counting', asy
   res = await mod.fetch(new Request('https://w/'), b.env, ctx);
   body = await res.json();
   // 8 already banked + 4 new. The first two must NOT be counted twice.
-  assert.equal(body.totalDistributed, 12);
+  assert.equal(body.totalDistributed, 12 * HOLDER_SHARE);
   assert.equal(body.totalFeesCollected, 3);
 
   const dbg = await (await mod.fetch(new Request('https://w/debug'), b.env, ctx)).json();
   assert.equal(dbg.blocksBehind, 0);
   assert.equal(dbg.lastError, null);
   assert.equal(dbg.startBlock, START);
-  assert.equal(typeof dbg.rawTotals.distributed, 'string');   // stored as string
-  assert.equal(dbg.rawTotals.distributed, (12n * E18).toString());
+  assert.equal(typeof dbg.rawTotals.paidOut, 'string');   // stored as string
+  assert.equal(dbg.rawTotals.paidOut, (12n * E18).toString());
+});
+
+test('fees track the rewards contract, not the platform-wide fee locker', async () => {
+  const { STREAMS, CONTRACTS } = await import('../src/config.js');
+  const fees = STREAMS.find((s) => s.id === 'feesIn');
+  assert.equal(fees.to.toLowerCase(), CONTRACTS.rewardsIndex.toLowerCase(),
+    'the fee locker is shared by every coin on the platform');
+  assert.equal(fees.from, undefined);
+});
+
+test('holder payout strips the protocol cut, matching Stockify', async () => {
+  const { holderPayout } = await import('../src/config.js');
+  // Stockify reported 77,671.73 collected and 69,904.56 paid to holders.
+  assert.equal(holderPayout({ paidOut: 77671.73125011318 }).toFixed(2), '69904.56');
+  assert.equal(holderPayout({ paidOut: 0 }), 0);
 });
 
 test('serves CORS and the documented shape', async () => {
   const mod = (await import('../src/index.js')).default;
-  const { env } = makeEnv(START + 99, { distributed: [], feesIn: [] });
+  const { env } = makeEnv(START + 99, { paidOut: [], feesIn: [] });
   const res = await mod.fetch(new Request('https://w/'), env, ctx);
   assert.equal(res.headers.get('access-control-allow-origin'), '*');
   const body = await res.json();
@@ -118,7 +135,7 @@ test('serves CORS and the documented shape', async () => {
 
 test('reset requires the admin token', async () => {
   const mod = (await import('../src/index.js')).default;
-  const { env, KV } = makeEnv(START + 99, { distributed: [[START + 1, E18]], feesIn: [] });
+  const { env, KV } = makeEnv(START + 99, { paidOut: [[START + 1, E18]], feesIn: [] });
   await runCron(mod, env);
   assert.ok(KV.store.size > 0);
 
@@ -135,7 +152,7 @@ test('reset requires the admin token', async () => {
 
 test('a failing RPC is recorded, not thrown, and totals are kept', async () => {
   const mod = (await import('../src/index.js')).default;
-  const { env, KV } = makeEnv(START + 99, { distributed: [[START + 1, 9n * E18]], feesIn: [] });
+  const { env, KV } = makeEnv(START + 99, { paidOut: [[START + 1, 9n * E18]], feesIn: [] });
   await runCron(mod, env);
 
   globalThis.fetch = async (url) => String(url).includes('dexscreener')
@@ -145,7 +162,7 @@ test('a failing RPC is recorded, not thrown, and totals are kept', async () => {
   await runCron(mod, env);                              // must not reject
   const dbg = await (await mod.fetch(new Request('https://w/debug'), env, ctx)).json();
   assert.match(dbg.lastError, /503/);
-  assert.equal(dbg.rawTotals.distributed, (9n * E18).toString(), 'totals survive an error');
+  assert.equal(dbg.rawTotals.paidOut, (9n * E18).toString(), 'totals survive an error');
 });
 
 test('counts holders from transfers, across a resumed backfill', async () => {
@@ -197,7 +214,7 @@ test('counts holders from transfers, across a resumed backfill', async () => {
 
 test('withholds the holder count until the backfill has finished', async () => {
   const mod = (await import('../src/index.js')).default;
-  const { env } = makeEnv(START + 500000, { distributed: [], feesIn: [] });
+  const { env } = makeEnv(START + 500000, { paidOut: [], feesIn: [] });
   await runCron(mod, env);                       // far more blocks than one run covers
 
   const body = await (await mod.fetch(new Request('https://w/'), env, ctx)).json();

@@ -10,7 +10,7 @@
 import { indexRange, makeRpc, toNumber, countHolders } from './indexer.js';
 import {
   STREAMS, START_BLOCK, CHUNK_SIZE, MAX_CHUNKS_PER_RUN, CONFIRMATIONS,
-  DEXSCREENER_KEX_TOKEN, TOKENS, CONTRACTS, EXCLUDE_FROM_HOLDERS,
+  DEXSCREENER_KEX_TOKEN, TOKENS, CONTRACTS, EXCLUDE_FROM_HOLDERS, holderPayout,
 } from './config.js';
 
 const STATE_KEY = 'state:v1';
@@ -151,15 +151,17 @@ function present(state, price) {
   const byId = {};
   SUM_STREAMS.forEach((s) => { byId[s.id] = toNumber(totals[s.id], s.decimals); });
 
-  const distributed = byId.distributed ?? null;
-  const feesIn = byId.feesIn ?? null;
+  const feesIn = byId.feesIn ?? 0;
+  // Strip the protocol's cut off the outflow, so "distributed" is what holders
+  // actually received rather than everything that left the contract.
+  const distributed = holderPayout(byId);
 
   return {
     totalDistributed: distributed,
-    totalDistributedUsd: price != null && distributed != null ? distributed * price : null,
+    totalDistributedUsd: price != null ? distributed * price : null,
     // Cumulative fees valued at the CURRENT price, not the price at the time of
     // each transfer. Good enough for a headline figure; say so if it matters.
-    totalFeesCollected: price != null && feesIn != null ? feesIn * price : null,
+    totalFeesCollected: price != null ? feesIn * price : null,
 
     // Counted from transfers, so no explorer is involved. Only trustworthy once
     // the backfill has finished — a partial scan under-counts.

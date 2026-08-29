@@ -158,11 +158,24 @@ Once it is up:
 url: ['https://stonkex-rewards.<you>.workers.dev', 'data/rewards.json'],
 ```
 
-⚠ **Verify the streams before trusting it.** Which flow means "fees" versus
-"distributed" has not been confirmed against the contracts — the fee locker in
-particular is shared across every coin on the platform, so as configured it
-likely over-counts. Check `/debug` against what thestonks.exchange reports for
-the token, adjust `STREAMS` in `worker/src/config.js`, then `POST /reset`.
+The streams were verified against Stockify's own panel for this token and now
+agree to the cent:
+
+| | Stockify | Indexer |
+|---|---|---|
+| Fees collected | 77,671.73 STONKEX | 77,671.73 |
+| Paid to holders | 69,904.56 STONKEX | 69,904.56 |
+
+Two things were wrong before that check. `feesIn` watched the platform's fee
+locker, which **every** coin on thestonks.exchange shares, so it summed the whole
+platform: 3,548,527 STONKEX against a true 77,672. And "distributed" summed
+everything leaving the rewards contract, which is fees collected, not the
+holders' share — the two differ by the protocol's 10%.
+
+`HOLDER_SHARE` in `worker/src/config.js` carries that 90/10 split, read off
+Stockify's own "TO HOLDERS 90% · 10% protocol · 0% creator". If the split ever
+changes, update it — or set `PROTOCOL_ADDRESS` and the cut is subtracted exactly
+instead, which survives any change to the percentage.
 
 And check the index contract on Basescan first: if it is verified and exposes a
 cumulative total as a view function, one `eth_call` replaces the whole log scan.
