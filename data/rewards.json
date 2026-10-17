@@ -29,10 +29,10 @@
   "marketCap": null,
   "liquidity": null,
   "volume24h": null,
-  "updatedAt": "2026-10-17T04:31:28.737Z",
+  "updatedAt": "2026-10-17T08:44:40.678Z",
   "meta": {
     "synced": false,
-    "blocksBehind": 515460,
-    "kexPriceUsd": 0.004461
+    "blocksBehind": 523056,
+    "kexPriceUsd": 0.00461
   }
 }
