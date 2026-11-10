@@ -28,11 +28,11 @@
   "holders": null,
   "marketCap": 7853,
   "liquidity": 5478.46,
-  "volume24h": 108.87,
-  "updatedAt": "2026-11-09T21:27:17.219Z",
+  "volume24h": 87.98,
+  "updatedAt": "2026-11-10T03:44:28.038Z",
   "meta": {
     "synced": false,
-    "blocksBehind": 3150640,
-    "kexPriceUsd": 0.001051
+    "blocksBehind": 3263794,
+    "kexPriceUsd": 0.0011
   }
 }
